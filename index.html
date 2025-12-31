@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>AR 각도기</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- 카메라 비디오 피드 -->
+    <video id="camera" autoplay playsinline></video>
+
+    <!-- 각도 표시 배지 -->
+    <div id="angle-badge">
+        <span id="angle-value">0</span>°
+        <span id="level-ok" class="hidden">✓</span>
+    </div>
+
+    <!-- 카메라 전환 버튼 -->
+    <button id="switch-camera" aria-label="카메라 전환">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+            <path d="M17 8l2-2M17 6l2 2" />
+        </svg>
+    </button>
+
+    <!-- 가로/세로 모드 전환 버튼 -->
+    <button id="switch-orientation" aria-label="화면 방향 전환">
+        <svg id="orientation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- 가로 모드 아이콘 (기본) -->
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <line x1="12" y1="10" x2="12" y2="14" />
+        </svg>
+        <span id="orientation-label">가로</span>
+    </button>
+
+    <!-- SVG 오버레이 -->
+    <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
+        <!-- 각도기 그룹 (하단 중앙) -->
+        <g id="protractor-group" transform="translate(50, 95)">
+            <!-- 각도기 배경 -->
+            <path id="protractor-bg" d="M -40 0 A 40 40 0 0 1 40 0 L 35 0 A 35 35 0 0 0 -35 0 Z"
+                fill="rgba(255, 255, 255, 0.85)" stroke="rgba(0, 0, 0, 0.3)" stroke-width="0.3" />
+
+            <!-- 눈금 -->
+            <g id="tick-marks"></g>
+
+            <!-- 중앙점 -->
+            <circle cx="0" cy="0" r="1.5" fill="rgba(0, 0, 0, 0.4)" />
+        </g>
+
+        <!-- 기준선 1 (수직) -->
+        <g id="line1-group" class="line-group">
+            <line id="line1" x1="50" y1="85" x2="50" y2="25" stroke="#007AFF" stroke-width="0.5"
+                stroke-linecap="round" />
+            <line id="line1-ext" x1="50" y1="25" x2="50" y2="0" stroke="#007AFF" stroke-width="0.5"
+                stroke-linecap="round" />
+            <circle id="handle1" cx="50" cy="25" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+        </g>
+
+        <!-- 기준선 2 (기울어진) -->
+        <g id="line2-group" class="line-group">
+            <line id="line2" x1="50" y1="85" x2="75" y2="35" stroke="#007AFF" stroke-width="0.5"
+                stroke-linecap="round" />
+            <line id="line2-ext" x1="75" y1="35" x2="90" y2="5" stroke="#007AFF" stroke-width="0.5"
+                stroke-linecap="round" />
+            <circle id="handle2" cx="75" cy="35" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+        </g>
+
+        <!-- 수평 기준선 (중력 방향에 수직) -->
+        <g id="gravity-line-group">
+            <line id="gravity-line" x1="10" y1="95" x2="90" y2="95" stroke="#34C759" stroke-width="0.6"
+                stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+            <circle id="gravity-indicator-left" cx="10" cy="95" r="1.5" fill="#34C759" />
+            <circle id="gravity-indicator-right" cx="90" cy="95" r="1.5" fill="#34C759" />
+        </g>
+    </svg>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
