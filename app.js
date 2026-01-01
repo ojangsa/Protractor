@@ -20,7 +20,7 @@
     // 연장선 요소
     const line1Ext = document.getElementById('line1-ext');
     const line2Ext = document.getElementById('line2-ext');
-    const EXTENSION_LENGTH = 70; // 연장선 길이
+    const EXTENSION_LENGTH = 100; // 연장선 길이
 
     // 수평 기준선 요소
     const gravityLineGroup = document.getElementById('gravity-line-group');
@@ -40,7 +40,7 @@
 
     // 현재 각도 (degree)
     let angle1 = 90;  // 수직선 (위쪽)
-    let angle2 = 30;  // 오른쪽 위
+    let angle2 = 60;  // 오른쪽 위
 
     // 수평 기준선 각도 (기기 기울기)
     let gravityAngle = 0;
