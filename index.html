@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AR 각도기">
-    <title>AR 각도기</title>
+    <title>PTNB 각도기</title>
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -29,40 +29,101 @@
     <div id="angle-badge">
         <span id="angle-value">0</span>°
         <span id="level-ok" class="hidden">✓</span>
+        <span id="tilt-ok" class="hidden">✓</span>
     </div>
 
-    <!-- 카메라 전환 버튼 -->
-    <button id="switch-camera" aria-label="카메라 전환">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-            <circle cx="12" cy="13" r="4" />
-            <path d="M17 8l2-2M17 6l2 2" />
-        </svg>
-    </button>
+    <!-- 각도 입력 패널 -->
+    <div id="angle-input-panel" class="hidden">
+        <label for="angle-input">각도:</label>
+        <input type="number" id="angle-input" min="-180" max="180" value="45" step="1" />
+        <span>°</span>
+    </div>
 
-    <!-- 가로/세로 모드 전환 버튼 -->
-    <button id="switch-orientation" aria-label="화면 방향 전환">
-        <svg id="orientation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <!-- 가로 모드 아이콘 (기본) -->
-            <rect x="2" y="6" width="20" height="12" rx="2" />
-            <line x1="12" y1="10" x2="12" y2="14" />
-        </svg>
-        <span id="orientation-label">가로</span>
-    </button>
+    <!-- 컨트롤 버튼 컨테이너 -->
+    <div class="controls-container">
+        <!-- 상단 우측 가로 배열 그룹 -->
+        <div class="controls-top-right">
+            <!-- 각도기 눈금 토글 버튼 -->
+            <button id="toggle-protractor" aria-label="각도기 눈금 표시 토글">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12" />
+                    <path d="M2 12h10" />
+                    <path d="M12 12V2" />
+                </svg>
+            </button>
+
+            <!-- 기울기선 토글 버튼 -->
+            <button id="toggle-tilt-line" aria-label="기울기선 표시 토글">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="2" x2="12" y2="22" />
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                </svg>
+            </button>
+
+            <!-- 카메라 전환 버튼 -->
+            <button id="switch-camera" aria-label="카메라 전환">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                    <path d="M17 8l2-2M17 6l2 2" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- 우측 세로 배열 그룹 -->
+        <div class="controls-right-column">
+            <!-- 가로/세로 모드 전환 버튼 -->
+            <button id="switch-orientation" aria-label="화면 방향 전환">
+                <svg id="orientation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <!-- 가로 모드 아이콘 (기본) -->
+                    <rect x="2" y="6" width="20" height="12" rx="2" />
+                    <line x1="12" y1="10" x2="12" y2="14" />
+                </svg>
+                <span id="orientation-label">가로</span>
+            </button>
+
+            <!-- 측정 모드 전환 버튼 -->
+            <button id="switch-mode" aria-label="측정 모드 전환">
+                <svg id="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M2 12h20" />
+                </svg>
+                <span id="mode-label">일반</span>
+            </button>
+
+            <!-- 중심점 리셋 버튼 -->
+            <button id="reset-center" aria-label="중심점 리셋">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <circle cx="12" cy="12" r="2" fill="currentColor" />
+                </svg>
+            </button>
+
+            <!-- 단축키 도움말 버튼 -->
+            <button id="help-btn" class="control-btn" aria-label="단축키 도움말" onclick="openHelpModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
 
     <!-- SVG 오버레이 -->
     <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
         <!-- 각도기 그룹 (하단 중앙) -->
         <g id="protractor-group" transform="translate(50, 95)">
-            <!-- 각도기 배경 -->
-            <path id="protractor-bg" d="M -40 0 A 40 40 0 0 1 40 0 L 35 0 A 35 35 0 0 0 -35 0 Z"
-                fill="rgba(255, 255, 255, 0.85)" stroke="rgba(0, 0, 0, 0.3)" stroke-width="0.3" />
+            <!-- 각도기 배경 (투명하게, 축소) -->
+            <path id="protractor-bg" d="M -20 0 A 20 20 0 0 1 20 0 L 17.5 0 A 17.5 17.5 0 0 0 -17.5 0 Z"
+                fill="rgba(0, 0, 0, 0.3)" stroke="rgba(255, 255, 255, 0.5)" stroke-width="0.2" />
 
             <!-- 눈금 -->
             <g id="tick-marks"></g>
 
             <!-- 중앙점 -->
-            <circle cx="0" cy="0" r="1.5" fill="rgba(0, 0, 0, 0.4)" />
+            <circle cx="0" cy="0" r="0.75" fill="rgba(255, 255, 255, 0.8)" />
         </g>
 
         <!-- 기준선 1 (수직) -->
@@ -83,14 +144,70 @@
             <circle id="handle2" cx="75" cy="35" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
         </g>
 
-        <!-- 수평 기준선 (중력 방향에 수직) -->
+        <!-- 수평 기준선 (좌우 기울기 - 녹색) -->
         <g id="gravity-line-group">
             <line id="gravity-line" x1="10" y1="95" x2="90" y2="95" stroke="#34C759" stroke-width="0.6"
                 stroke-linecap="round" stroke-dasharray="1.5,0.8" />
             <circle id="gravity-indicator-left" cx="10" cy="95" r="1.5" fill="#34C759" />
             <circle id="gravity-indicator-right" cx="90" cy="95" r="1.5" fill="#34C759" />
         </g>
+
+        <!-- 수직 기준선 (앞뒤 기울기 - 주황색) -->
+        <g id="tilt-line-group">
+            <line id="tilt-line" x1="50" y1="10" x2="50" y2="90" stroke="#FF9500" stroke-width="0.6"
+                stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+            <circle id="tilt-indicator-top" cx="50" cy="10" r="1.5" fill="#FF9500" />
+            <circle id="tilt-indicator-bottom" cx="50" cy="90" r="1.5" fill="#FF9500" />
+        </g>
     </svg>
+
+    <!-- 단축키 도움말 모달 -->
+    <div id="help-modal" class="modal hidden" onclick="if(event.target === this) closeHelpModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>단축키 안내</h2>
+                <button id="close-help" class="close-btn" onclick="closeHelpModal()">&times;</button>
+            </div>
+            <div class="shortcut-list">
+                <div class="shortcut-item">
+                    <span class="key">M</span>
+                    <span class="desc">일반 / 각도설정 모드 전환</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">R</span>
+                    <span class="desc">중심점 리셋</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">F</span>
+                    <span class="desc">각도기 눈금 켜기/끄기</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">;</span>
+                    <span class="desc">기울기 지시선 켜기/끄기</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">/</span>
+                    <span class="desc">전후면 카메라 전환</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">W, A, S, D</span>
+                    <span class="desc">중심점 이동 (Shift: 빠르게)</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">. ,</span>
+                    <span class="desc">각도 조절 (+1, -1)</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">&gt; &lt;</span>
+                    <span class="desc">각도 조절 (+10, -10)</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="key">0-9</span>
+                    <span class="desc">각도 즉시 설정 (10~50, -10~-50)</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

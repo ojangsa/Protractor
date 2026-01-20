@@ -78,7 +78,22 @@ body {
     animation: pulse 0.5s ease-out;
 }
 
-#level-ok.hidden {
+#tilt-ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #FF9500;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: bold;
+    margin-left: 4px;
+    animation: pulse 0.5s ease-out;
+}
+
+#level-ok.hidden,
+#tilt-ok.hidden {
     display: none;
 }
 
@@ -98,13 +113,39 @@ body {
     }
 }
 
-/* 카메라 전환 버튼 */
-#switch-camera {
+/* 컨트롤 버튼 컨테이너 */
+.controls-container {
     position: fixed;
-    top: env(safe-area-inset-top, 20px);
-    right: 20px;
-    width: 50px;
-    height: 50px;
+    /* 배지 높이(약 56px)와 버튼 높이(44px)의 중앙 정렬을 위해 6px 추가 */
+    top: calc(env(safe-area-inset-top, 20px) + 6px);
+    right: max(env(safe-area-inset-right, 20px), 20px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    z-index: 100;
+}
+
+/* 상단 우측 그룹 (가로 배열) */
+.controls-top-right {
+    display: flex;
+    flex-direction: row-reverse;
+    /* 카메라 버튼이 가장 오른쪽에 오도록 */
+    gap: 8px;
+}
+
+/* 우측 세로 그룹 */
+.controls-right-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+/* 개별 버튼 공통 스타일 */
+.controls-container button {
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(20px);
@@ -113,62 +154,123 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
     transition: transform 0.2s ease, background 0.2s ease;
 }
 
-#switch-camera:active {
+.controls-container button:active {
     transform: scale(0.92);
     background: rgba(255, 255, 255, 1);
 }
 
-#switch-camera svg {
+.controls-container button svg {
     width: 24px;
     height: 24px;
+}
+
+/* 카메라 전환 버튼 */
+#switch-camera svg {
     color: #333;
 }
 
-/* 가로/세로 모드 전환 버튼 */
-#switch-orientation {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 20px) + 60px);
-    right: 20px;
-    height: 50px;
-    padding: 0 16px;
-    border-radius: 25px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+/* 기울기선 토글 버튼 */
+#toggle-tilt-line svg {
+    color: #FF9500;
+}
+
+#toggle-tilt-line.off svg {
+    color: #999;
+}
+
+/* 각도기 눈금 토글 버튼 */
+#toggle-protractor svg {
+    color: #007AFF;
+}
+
+#toggle-protractor.off svg {
+    color: #999;
+}
+
+/* 가로/세로 모드 전환 버튼 & 측정 모드 전환 버튼 (알약 모양) */
+#switch-orientation,
+#switch-mode {
+    width: auto;
+    /* 너비 자동 (공통 스타일 덮어쓰기) */
+    padding: 0 14px;
+    border-radius: 22px;
     gap: 6px;
-    z-index: 100;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-    transition: transform 0.2s ease, background 0.2s ease;
 }
 
-#switch-orientation:active {
-    transform: scale(0.95);
-    background: rgba(255, 255, 255, 1);
-}
-
-#switch-orientation svg {
+#switch-orientation svg,
+#switch-mode svg {
     width: 20px;
     height: 20px;
     color: #333;
 }
 
-#switch-orientation #orientation-label {
+#switch-orientation #orientation-label,
+#switch-mode #mode-label {
     font-size: 14px;
     font-weight: 600;
     color: #333;
 }
 
+/* 중심점 리셋 버튼 */
+#reset-center svg {
+    color: #333;
+}
+
+
+/* 각도 입력 패널 */
+#angle-input-panel {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 20px) + 65px);
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+#angle-input-panel.hidden {
+    display: none;
+}
+
+#angle-input-panel label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+#angle-input-panel input {
+    width: 60px;
+    padding: 6px 10px;
+    border: 2px solid #007AFF;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    background: white;
+}
+
+#angle-input-panel input:focus {
+    border-color: #0051d5;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+#angle-input-panel span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
 
 /* 기준선 그룹 */
 .line-group {
@@ -204,7 +306,7 @@ body {
 
 /* 수평 기준선 (중력) */
 #gravity-line-group {
-    transition: transform 0.1s ease-out;
+    transition: transform 0.05s linear;
 }
 
 #gravity-line {
@@ -213,6 +315,20 @@ body {
 
 #gravity-indicator-left,
 #gravity-indicator-right {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* 수직 기준선 (기울기) */
+#tilt-line-group {
+    transition: transform 0.05s linear;
+}
+
+#tilt-line {
+    filter: drop-shadow(0 1px 3px rgba(255, 149, 0, 0.5));
+}
+
+#tilt-indicator-top,
+#tilt-indicator-bottom {
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
@@ -273,7 +389,110 @@ body {
     }
 
     #switch-camera {
-        top: 20px;
-        right: max(env(safe-area-inset-right, 20px), 20px);
+        /* 미디어 쿼리 스타일 제거됨 (공통 컨테이너에서 처리) */
     }
+
+    #angle-input-panel {
+        top: 85px;
+        /* 배지와의 간격 확보 */
+        left: max(env(safe-area-inset-left, 20px), 20px);
+        /* 노치 대응 */
+    }
+}
+
+/* 단축키 도움말 모달 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.modal.hidden {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    color: white;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: white;
+}
+
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+}
+
+.shortcut-item .key {
+    background-color: rgba(255, 255, 255, 0.15);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #ffd700;
+    min-width: 24px;
+    text-align: center;
+}
+
+.shortcut-item .desc {
+    color: rgba(255, 255, 255, 0.8);
+    text-align: right;
+    flex: 1;
+    margin-left: 12px;
 }

@@ -22,11 +22,37 @@
     const line2Ext = document.getElementById('line2-ext');
     const EXTENSION_LENGTH = 100; // 연장선 길이
 
-    // 수평 기준선 요소
+    // 측정 모드 관련 요소
+    const switchModeBtn = document.getElementById('switch-mode');
+    const modeLabel = document.getElementById('mode-label');
+    const angleInputPanel = document.getElementById('angle-input-panel');
+    const angleInput = document.getElementById('angle-input');
+    const resetCenterBtn = document.getElementById('reset-center');
+
+    // 도움말 모달 관련
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help');
+
+    // 수평 기준선 요소 (좌우 기울기)
     const gravityLineGroup = document.getElementById('gravity-line-group');
     const gravityLine = document.getElementById('gravity-line');
     const gravityIndicatorLeft = document.getElementById('gravity-indicator-left');
     const gravityIndicatorRight = document.getElementById('gravity-indicator-right');
+
+    // 수직 기준선 요소 (앞뒤 기울기)
+    const tiltLineGroup = document.getElementById('tilt-line-group');
+    const tiltLine = document.getElementById('tilt-line');
+    const tiltIndicatorTop = document.getElementById('tilt-indicator-top');
+    const tiltIndicatorBottom = document.getElementById('tilt-indicator-bottom');
+    const toggleTiltLineBtn = document.getElementById('toggle-tilt-line');
+
+    let tiltLineVisible = true;  // 기울기선 표시 상태
+
+    // 각도기 눈금 요소
+    const protractorGroup = document.getElementById('protractor-group');
+    const toggleProtractorBtn = document.getElementById('toggle-protractor');
+    let protractorVisible = true; // 각도기 눈금 표시 상태
 
     // 상태
     let facingMode = 'environment'; // 후면 카메라 기본
@@ -35,25 +61,48 @@
     let activeHandle = null;
 
     // 중심점 (각도기 중심)
-    const CENTER = { x: 50, y: 95 };
-    const LINE_LENGTH = 60; // 기준선 길이
+    // 중심점 (각도기 중심) - 이동 가능하도록 변수로 변경
+    let currentCenter = { x: 50, y: 95 };
+    const LINE_LENGTH = 30; // 기준선 기본 길이 (축소)
+    const MIN_HANDLE_DISTANCE = 15; // 핸들 최소 거리
+    const MAX_HANDLE_DISTANCE = 80; // 핸들 최대 거리
 
     // 현재 각도 (degree)
     let angle1 = 90;  // 수직선 (위쪽)
-    let angle2 = 60;  // 오른쪽 위
+    let angle2 = 70;  // 오른쪽 위 (차이 20도)
 
-    // 수평 기준선 각도 (기기 기울기)
+    // 핸들 거리 (중심점으로부터의 거리)
+    let handleDistance1 = LINE_LENGTH;
+    let handleDistance2 = LINE_LENGTH;
+
+    // 수평 기준선 각도 (좌우 기울기)
     let gravityAngle = 0;
 
+    // 수직 기준선 각도 (앞뒤 기울기)
+    let tiltAngle = 0;
+
     // 화면 방향 모드 ('landscape' = 가로, 'portrait' = 세로)
-    let orientationMode = 'landscape';
+    let orientationMode = 'portrait'; // 초기값을 세로로 설정하여 init에서 가로로 전환되게 함
     const switchOrientationBtn = document.getElementById('switch-orientation');
     const orientationIcon = document.getElementById('orientation-icon');
     const orientationLabel = document.getElementById('orientation-label');
 
     // 수평 OK 표시
     const levelOk = document.getElementById('level-ok');
-    const LEVEL_THRESHOLD = 1; // 수평 판정 임계값 (±1도)
+    const tiltOk = document.getElementById('tilt-ok');
+    const LEVEL_THRESHOLD = 1.0; // 수평 판정 임계값 (±1.0도)
+
+    // 측정 모드 ('normal' = 일반 모드, 'angle-lock' = 각도 설정 모드)
+    let measurementMode = 'normal';
+    let lockedAngle = 20; // 각도 설정 모드에서 두 선 사이의 각도
+
+    // 카메라 줌 관련 상태
+    let currentZoom = 1;
+    let minZoom = 1;
+    let maxZoom = 1;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
+    let isApplyingZoom = false; // 줌 적용 중 플래그 (스로틀링용)
 
     // 초기화
     init();
@@ -62,15 +111,27 @@
         createTickMarks();
         updateLines();
         updateGravityLine();
+        updateTiltLine();
         setupEventListeners();
         setupDeviceOrientation();
         requestCameraAccess();
+
+        // 기본 모드: 가로 모드
+        toggleOrientationMode();  // 가로 모드로 전환 (portrait -> landscape)
+        // 일반 모드로 시작 (핸들 드래그 가능, 단 핸들1은 고정)
+        handle1.style.display = 'none';
+
+        // 키보드 단축키가 바로 작동하도록 포커스 설정
+        document.body.focus();
     }
 
     // 눈금 생성
     function createTickMarks() {
-        const radius = 37.5;
-        const innerRadius = 35;
+        const radius = 18.75;  // 축소 (기존 37.5의 절반)
+        const innerRadius = 17.5;  // 축소 (기존 35의 절반)
+
+        // 통일된 색상 (흰색 반투명)
+        const tickColor = 'rgba(255, 255, 255, 0.8)';
 
         for (let deg = 0; deg <= 180; deg += 10) {
             const rad = (deg * Math.PI) / 180;
@@ -88,25 +149,28 @@
             tick.setAttribute('y1', outerY);
             tick.setAttribute('x2', innerX);
             tick.setAttribute('y2', innerY);
-            tick.setAttribute('stroke', 'rgba(0, 0, 0, 0.6)');
+            tick.setAttribute('stroke', tickColor);
             tick.setAttribute('stroke-width', '0.3');
             tickMarks.appendChild(tick);
 
-            // 숫자 라벨
+            // 숫자 라벨 (90도가 0, 양쪽 끝이 90)
             if (deg % 10 === 0) {
-                const labelRadius = 31;
+                const labelRadius = 16.5;  // 축소 (기존 33의 절반)
                 const labelX = -cos * labelRadius;
                 const labelY = -sin * labelRadius;
+
+                // 표시 값 변환: 90도->0, 0도->90, 180도->90
+                const displayValue = Math.abs(90 - deg);
 
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', labelX);
                 text.setAttribute('y', labelY);
                 text.setAttribute('text-anchor', 'middle');
                 text.setAttribute('dominant-baseline', 'middle');
-                text.setAttribute('font-size', '3');
+                text.setAttribute('font-size', '1.1');  // 축소
                 text.setAttribute('font-weight', '500');
-                text.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
-                text.textContent = deg;
+                text.setAttribute('fill', tickColor);
+                text.textContent = displayValue;
                 tickMarks.appendChild(text);
             }
 
@@ -127,7 +191,7 @@
                 smallTick.setAttribute('y1', smallOuterY);
                 smallTick.setAttribute('x2', smallInnerX);
                 smallTick.setAttribute('y2', smallInnerY);
-                smallTick.setAttribute('stroke', 'rgba(0, 0, 0, 0.4)');
+                smallTick.setAttribute('stroke', tickColor);
                 smallTick.setAttribute('stroke-width', '0.2');
                 tickMarks.appendChild(smallTick);
             }
@@ -140,21 +204,21 @@
         const rad1 = (angle1 * Math.PI) / 180;
         const rad2 = (angle2 * Math.PI) / 180;
 
-        // 끝점 좌표 계산 (핸들 위치)
-        const end1X = CENTER.x - Math.cos(rad1) * LINE_LENGTH;
-        const end1Y = CENTER.y - Math.sin(rad1) * LINE_LENGTH;
-        const end2X = CENTER.x - Math.cos(rad2) * LINE_LENGTH;
-        const end2Y = CENTER.y - Math.sin(rad2) * LINE_LENGTH;
+        // 끝점 좌표 계산 (핸들 위치 - 동적 거리 사용)
+        const end1X = currentCenter.x - Math.cos(rad1) * handleDistance1;
+        const end1Y = currentCenter.y - Math.sin(rad1) * handleDistance1;
+        const end2X = currentCenter.x - Math.cos(rad2) * handleDistance2;
+        const end2Y = currentCenter.y - Math.sin(rad2) * handleDistance2;
 
-        // 연장선 끝점 계산 (핸들 이후)
-        const ext1X = CENTER.x - Math.cos(rad1) * (LINE_LENGTH + EXTENSION_LENGTH);
-        const ext1Y = CENTER.y - Math.sin(rad1) * (LINE_LENGTH + EXTENSION_LENGTH);
-        const ext2X = CENTER.x - Math.cos(rad2) * (LINE_LENGTH + EXTENSION_LENGTH);
-        const ext2Y = CENTER.y - Math.sin(rad2) * (LINE_LENGTH + EXTENSION_LENGTH);
+        // 연장선 끝점 계산 (핸들 이후로 EXTENSION_LENGTH만큼 연장)
+        const ext1X = currentCenter.x - Math.cos(rad1) * (handleDistance1 + EXTENSION_LENGTH);
+        const ext1Y = currentCenter.y - Math.sin(rad1) * (handleDistance1 + EXTENSION_LENGTH);
+        const ext2X = currentCenter.x - Math.cos(rad2) * (handleDistance2 + EXTENSION_LENGTH);
+        const ext2Y = currentCenter.y - Math.sin(rad2) * (handleDistance2 + EXTENSION_LENGTH);
 
         // 라인 업데이트
-        line1.setAttribute('x1', CENTER.x);
-        line1.setAttribute('y1', CENTER.y);
+        line1.setAttribute('x1', currentCenter.x);
+        line1.setAttribute('y1', currentCenter.y);
         line1.setAttribute('x2', end1X);
         line1.setAttribute('y2', end1Y);
         handle1.setAttribute('cx', end1X);
@@ -166,8 +230,8 @@
         line1Ext.setAttribute('x2', ext1X);
         line1Ext.setAttribute('y2', ext1Y);
 
-        line2.setAttribute('x1', CENTER.x);
-        line2.setAttribute('y1', CENTER.y);
+        line2.setAttribute('x1', currentCenter.x);
+        line2.setAttribute('y1', currentCenter.y);
         line2.setAttribute('x2', end2X);
         line2.setAttribute('y2', end2Y);
         handle2.setAttribute('cx', end2X);
@@ -191,8 +255,29 @@
         // 카메라 전환
         switchCameraBtn.addEventListener('click', switchCamera);
 
+        // 기울기선 토글
+        toggleTiltLineBtn.addEventListener('click', toggleTiltLine);
+
+        // 각도기 눈금 토글
+        toggleProtractorBtn.addEventListener('click', toggleProtractor);
+
         // 가로/세로 모드 전환
         switchOrientationBtn.addEventListener('click', toggleOrientationMode);
+
+        // 측정 모드 전환
+        switchModeBtn.addEventListener('click', toggleMeasurementMode);
+
+        // 중심점 리셋
+        resetCenterBtn.addEventListener('click', () => {
+            resetCenter();
+        });
+
+        // 도움말 모달 이벤트: HTML 인라인 onclick 사용으로 변경 (아이패드 호환성)
+        // 기존 addEventListener 코드 제거됨
+
+        // 각도 입력 변경
+        angleInput.addEventListener('input', onAngleInputChange);
+        angleInput.addEventListener('keydown', onAngleInputKeyDown);
 
         // 마우스 이벤트 (데스크탑)
         overlay.addEventListener('mousedown', onPointerDown);
@@ -219,18 +304,211 @@
         document.addEventListener('touchmove', onTouchMove, { passive: false });
         document.addEventListener('touchend', onTouchEnd);
         document.addEventListener('touchcancel', onTouchEnd);
+
+        // 키보드 이벤트
+        document.addEventListener('keydown', onKeyDown);
     }
 
-    // 수평 기준선 업데이트
+    // 키보드 이벤트 핸들러
+    function onKeyDown(e) {
+        // 입력 필드에 포커스가 있으면 키보드 단축키 무시
+        if (document.activeElement === angleInput) {
+            return;
+        }
+
+        switch (e.key) {
+            // Esc: 모달 닫기
+            case 'Escape':
+                if (!helpModal.classList.contains('hidden')) {
+                    closeHelpModal();
+                    e.preventDefault();
+                }
+                break;
+
+            // M 또는 m: 측정 모드 전환
+            case 'M':
+            case 'm':
+                toggleMeasurementMode();
+                e.preventDefault();
+                break;
+
+            // Enter: 각도설정 모드에서 입력 필드로 포커스 이동
+            case 'Enter':
+                if (measurementMode === 'angle-lock') {
+                    angleInput.focus();
+                    angleInput.select(); // 전체 선택
+                    e.preventDefault();
+                }
+                break;
+
+            // . (마침표): 각도 증가
+            case '.':
+                syncLockedAngle();
+                updateAngleWithLock(Math.min(180, lockedAngle + 1));
+                e.preventDefault();
+                break;
+
+            // , (쉼표): 각도 감소 (음수 허용)
+            case ',':
+                syncLockedAngle();
+                updateAngleWithLock(Math.max(-180, lockedAngle - 1));
+                e.preventDefault();
+                break;
+
+            // > (Shift + .): 각도 10도 증가
+            case '>':
+                syncLockedAngle();
+                updateAngleWithLock(Math.min(180, lockedAngle + 10));
+                e.preventDefault();
+                break;
+
+            // < (Shift + ,): 각도 10도 감소 (음수 허용)
+            case '<':
+                syncLockedAngle();
+                updateAngleWithLock(Math.max(-180, lockedAngle - 10));
+                e.preventDefault();
+                break;
+
+            // 숫자키 1-9, 0: 빠른 각도 설정
+            case '1': case '2': case '3': case '4': case '5':
+            case '6': case '7': case '8': case '9': case '0':
+                // 1~5: 양수(10~50), 6~0: 음수(-10~-50)
+                const anglePresets = {
+                    '1': 10, '2': 20, '3': 30, '4': 40, '5': 50,
+                    '6': -10, '7': -20, '8': -30, '9': -40, '0': -50
+                };
+                syncLockedAngle();
+                updateAngleWithLock(anglePresets[e.key]);
+                e.preventDefault();
+                break;
+
+            // / (슬래시): 전후면 카메라 전환
+            case '/':
+                switchCamera();
+                e.preventDefault();
+                break;
+
+            // ; (세미콜론): 기울기선 토글
+            case ';':
+                toggleTiltLine();
+
+                e.preventDefault();
+                break;
+
+            // f: 각도기 눈금 토글
+            case 'f':
+            case 'F':
+                toggleProtractor();
+                e.preventDefault();
+                break;
+
+            // r: 중심점 리셋
+            case 'r':
+            case 'R':
+                resetCenter();
+                e.preventDefault();
+                break;
+
+            // W, A, S, D: 중심점 이동
+            case 'w': case 'W':
+            case 'a': case 'A':
+            case 's': case 'S':
+            case 'd': case 'D':
+                const step = e.shiftKey ? 10 : 1;
+                const newCenter = { x: currentCenter.x, y: currentCenter.y };
+
+                switch (e.key.toLowerCase()) {
+                    case 'w': newCenter.y -= step; break;
+                    case 'a': newCenter.x -= step; break;
+                    case 's': newCenter.y += step; break;
+                    case 'd': newCenter.x += step; break;
+                }
+
+                updateCenterFromPoint(newCenter);
+                e.preventDefault();
+                break;
+        }
+    }
+
+    // 각도설정 모드에서 선 위치 업데이트
+    function updateLockedAngleLines() {
+        // line1(수직선)은 수평 기준선과 항상 직각
+        angle1 = gravityAngle + 90;
+
+        // line2는 line1으로부터 lockedAngle만큼 떨어진 위치
+        // 음수일 경우 왼쪽으로, 양수일 경우 오른쪽으로
+        angle2 = angle1 + lockedAngle;
+
+        // angle1 범위 조정 (0-180도 범위 내로)
+        while (angle1 > 180) angle1 -= 180;
+        while (angle1 < 0) angle1 += 180;
+
+        // angle2는 -180 ~ 360 범위를 허용 (음수 각도 지원)
+        // 0-180 범위로 정규화
+        while (angle2 > 180) angle2 -= 180;
+        while (angle2 < 0) angle2 += 180;
+
+        updateLines();
+    }
+
+    // 수평 기준선 업데이트 (좌우 기울기)
     function updateGravityLine() {
-        // 중력선의 y 위치를 CENTER.y로 업데이트
-        gravityLine.setAttribute('y1', CENTER.y);
-        gravityLine.setAttribute('y2', CENTER.y);
-        gravityIndicatorLeft.setAttribute('cy', CENTER.y);
-        gravityIndicatorRight.setAttribute('cy', CENTER.y);
+        // 중력선의 y 위치를 currentCenter.y로 업데이트
+        gravityLine.setAttribute('y1', currentCenter.y);
+        gravityLine.setAttribute('y2', currentCenter.y);
+        gravityIndicatorLeft.setAttribute('cy', currentCenter.y);
+        gravityIndicatorRight.setAttribute('cy', currentCenter.y);
 
         // 중심점 기준으로 회전
-        gravityLineGroup.setAttribute('transform', `rotate(${gravityAngle}, ${CENTER.x}, ${CENTER.y})`);
+        gravityLineGroup.setAttribute('transform', `rotate(${gravityAngle}, ${currentCenter.x}, ${currentCenter.y})`);
+    }
+
+    // 수직 기준선 업데이트 (앞뒤 기울기)
+    function updateTiltLine() {
+        // 수직선의 x 위치를 currentCenter.x로 업데이트
+        tiltLine.setAttribute('x1', currentCenter.x);
+        tiltLine.setAttribute('x2', currentCenter.x);
+        tiltIndicatorTop.setAttribute('cx', currentCenter.x);
+        tiltIndicatorBottom.setAttribute('cx', currentCenter.x);
+
+        // y 위치 설정
+        const lineTop = currentCenter.y - 80;
+        const lineBottom = currentCenter.y;
+        tiltLine.setAttribute('y1', lineTop);
+        tiltLine.setAttribute('y2', lineBottom);
+        tiltIndicatorTop.setAttribute('cy', lineTop);
+        tiltIndicatorBottom.setAttribute('cy', lineBottom);
+
+        // 중심점 기준으로 앞뒤 기울기 표시 (수평 이동으로 표현)
+        const offsetX = tiltAngle * 0.5; // 기울기에 따른 수평 오프셋
+        tiltLineGroup.setAttribute('transform', `translate(${offsetX}, 0)`);
+    }
+
+    // 기울기선 토글
+    // 기울기선 토글
+    function toggleTiltLine() {
+        tiltLineVisible = !tiltLineVisible;
+        if (tiltLineVisible) {
+            tiltLineGroup.style.display = '';
+            toggleTiltLineBtn.classList.remove('off');
+        } else {
+            tiltLineGroup.style.display = 'none';
+            toggleTiltLineBtn.classList.add('off');
+        }
+        console.log('기울기선 표시:', tiltLineVisible);
+    }
+
+    // 각도기 눈금 토글
+    function toggleProtractor() {
+        protractorVisible = !protractorVisible;
+        if (protractorVisible) {
+            protractorGroup.style.display = '';
+            toggleProtractorBtn.classList.remove('off');
+        } else {
+            protractorGroup.style.display = 'none';
+            toggleProtractorBtn.classList.add('off');
+        }
+        console.log('각도기 눈금 표시:', protractorVisible);
     }
 
     // DeviceOrientation 설정
@@ -262,30 +540,80 @@
         }
     }
 
+    const SENSITIVITY = 1.0; // 수평 기준선 민감도 (1.0 = 1:1 실제 반응, 낮을수록 둔감)
+
     function handleOrientation(event) {
         // gamma: 좌우 기울기 (-90 ~ 90) - 세로 모드
         // beta: 앞뒤 기울기 (-180 ~ 180) - 가로 모드에서 좌우가 됨
+        // alpha: 나침반 방향 (0 ~ 360)
 
         if (orientationMode === 'landscape') {
             // 가로 모드 (우측 회전, 홈버튼이 왼쪽)
             let beta = event.beta || 0;
-            gravityAngle = beta;
+            let gamma = event.gamma || 0;
+
+            // beta(좌우 기울기) 보정
+            let adjustedBeta = beta;
+            if (beta > 90) {
+                adjustedBeta = 180 - beta;
+            } else if (beta < -90) {
+                adjustedBeta = -180 - beta;
+            }
+            gravityAngle = adjustedBeta * SENSITIVITY;    // 민감도 적용
+
+            // 주황색 수직선: 좌우 기울기
+            if (Math.abs(beta) > 90) {
+                tiltAngle = -(gamma - 90);
+            } else {
+                tiltAngle = -(gamma + 90);
+            }
         } else {
             // 세로 모드
             let gamma = event.gamma || 0;
-            gravityAngle = -gamma;
+            gravityAngle = -gamma * SENSITIVITY;        // 민감도 적용
+
+            // 앞뒤 기울기는 beta 사용 (90도 기준에서 얼마나 벗어났는지)
+            let beta = event.beta || 0;
+            tiltAngle = beta - 90;  // 직립 상태가 0이 되도록
         }
 
         // 각도 제한 (-45 ~ 45도)
         gravityAngle = Math.max(-45, Math.min(45, gravityAngle));
+        tiltAngle = Math.max(-45, Math.min(45, tiltAngle));
 
         updateGravityLine();
+        updateTiltLine();
 
-        // 수평 OK 표시 (±임계값 이내면 수평)
+        // 각도 설정 모드에서는 수평 기준선이 변경되면 수직선도 자동 조정
+        if (measurementMode === 'angle-lock') {
+            // line1(수직선)은 수평 기준선과 항상 직각
+            angle1 = gravityAngle + 90;
+
+            // line2는 line1으로부터 lockedAngle만큼 떨어진 위치
+            angle2 = angle1 + lockedAngle;
+
+            // 각도 범위 조정
+            if (angle1 > 180) angle1 -= 180;
+            if (angle1 < 0) angle1 += 180;
+            if (angle2 > 180) angle2 -= 180;
+            if (angle2 < 0) angle2 += 180;
+
+            updateLines();
+        }
+
+        // 수평 OK 표시 (±임계값 이내면 수평 - 녹색)
         if (Math.abs(gravityAngle) <= LEVEL_THRESHOLD) {
             levelOk.classList.remove('hidden');
         } else {
             levelOk.classList.add('hidden');
+        }
+
+        // 수직 OK 표시 (±임계값 이내면 수직 - 주황색)
+        // tiltAngle은 가로 모드에서 수직일 때 0이 되도록 보정되어 있음
+        if (Math.abs(tiltAngle) <= LEVEL_THRESHOLD) {
+            tiltOk.classList.remove('hidden');
+        } else {
+            tiltOk.classList.add('hidden');
         }
     }
 
@@ -301,10 +629,15 @@
 
             // 세로 모드: viewBox 세로 비율로 변경
             overlay.setAttribute('viewBox', '0 0 100 150');
-            // 각도기 위치 하단으로 이동
-            protractorGroup.setAttribute('transform', 'translate(50, 140)');
             // 중심점 업데이트
-            CENTER.y = 140;
+            currentCenter.y = 140;
+            currentCenter.x = 50;
+
+            // 각도기 위치 하단으로 이동 (transform 대신 직접 좌표 이동)
+            protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+            // 화면 방향 세로로 잠금
+            lockScreenOrientation('portrait');
         } else {
             orientationMode = 'landscape';
             orientationLabel.textContent = '가로';
@@ -313,18 +646,126 @@
 
             // 가로 모드: viewBox 원래대로
             overlay.setAttribute('viewBox', '0 0 100 100');
-            // 각도기 위치 원래대로 (더 아래로)
-            protractorGroup.setAttribute('transform', 'translate(50, 95)');
+            // 각도기 위치 원래대로 (transform 대신 직접 좌표 이동)
+            protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
             // 중심점 원래대로
-            CENTER.y = 95;
+            currentCenter.y = 95;
+            currentCenter.x = 50;
+
+            // 화면 방향 가로로 잠금
+            lockScreenOrientation('landscape');
         }
 
         // 라인 및 중력선 위치 업데이트
         updateLines();
         updateGravityLine();
 
-        console.log('화면 방향 모드:', orientationMode, 'CENTER:', CENTER);
+        console.log('화면 방향 모드:', orientationMode, 'CENTER:', currentCenter);
     }
+
+    // 중심점 리셋
+    function resetCenter() {
+        if (orientationMode === 'landscape') {
+            currentCenter.x = 50;
+            currentCenter.y = 95;
+        } else {
+            currentCenter.x = 50;
+            currentCenter.y = 140;
+        }
+
+        // 각도기 그룹 위치 업데이트
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 모든 라인 및 핸들 업데이트
+        updateLines();
+        updateGravityLine();
+        updateTiltLine();
+
+        console.log('중심점 리셋 완료', currentCenter);
+    }
+
+    // 화면 방향 잠금
+    function lockScreenOrientation(orientation) {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock(orientation).catch(err => {
+                console.log('화면 방향 잠금 실패 (PWA 필요):', err.message);
+            });
+        }
+    }
+
+    // 측정 모드 전환
+    function toggleMeasurementMode() {
+        if (measurementMode === 'normal') {
+            measurementMode = 'angle-lock';
+            modeLabel.textContent = '각도설정';
+            angleInputPanel.classList.remove('hidden');
+
+            // 핸들 숨기기 (핸들1만 숨김, 핸들2는 조작 가능)
+            handle1.style.display = 'none';
+            handle2.style.display = '';
+
+            // 각도 설정 모드로 전환하면 수직선을 수평기준선과 직각으로 설정
+            angle1 = gravityAngle + 90;
+            angle2 = angle1 + lockedAngle;
+
+            // 각도 범위 조정 (0-180도 범위 내로)
+            if (angle1 > 180) angle1 -= 180;
+            if (angle1 < 0) angle1 += 180;
+            if (angle2 > 180) angle2 -= 180;
+            if (angle2 < 0) angle2 += 180;
+
+            updateLines();
+            console.log('각도 설정 모드로 전환');
+        } else {
+            measurementMode = 'normal';
+            modeLabel.textContent = '일반';
+            angleInputPanel.classList.add('hidden');
+
+            // 핸들 다시 표시 (핸들2만 표시, 핸들1은 고정)
+            handle1.style.display = 'none';
+            handle2.style.display = '';
+
+            // 일반 모드로 돌아오면 수직선은 90도로 고정
+            angle1 = 90;
+            updateLines();
+
+            console.log('일반 모드로 전환');
+        }
+    }
+
+    // 각도 입력 변경 핸들러
+    function onAngleInputChange(e) {
+        const value = parseInt(e.target.value);
+        if (!isNaN(value) && value >= -180 && value <= 180) {
+            lockedAngle = value;
+
+            // 각도 설정 모드일 때만 즉시 업데이트
+            if (measurementMode === 'angle-lock') {
+                updateLockedAngleLines();
+            }
+        }
+    }
+
+    // 각도 입력 필드 keydown 핸들러 (엔터키로 포커스 해제)
+    function onAngleInputKeyDown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
+            // 입력값 적용
+            const value = parseInt(angleInput.value);
+            if (!isNaN(value) && value >= -180 && value <= 180) {
+                updateAngleWithLock(value);
+            }
+            // 포커스 해제하여 키보드 단축키 다시 활성화
+            angleInput.blur();
+
+            // 포커스가 body로 이동하도록 보장
+            document.body.focus();
+        }
+    }
+
 
     // SVG 좌표 변환
     function getSVGPoint(clientX, clientY) {
@@ -337,9 +778,24 @@
         };
     }
 
+    // 각도기 그룹 히트 체크 (중심점 드래그)
+    function checkCenterHit(point) {
+        // 중심점 주변 히트 영역
+        const hitRadius = 15;
+        const dist = Math.hypot(point.x - currentCenter.x, point.y - currentCenter.y);
+
+        if (dist < hitRadius) {
+            console.log('Hit center');
+            startDrag('center');
+            return true;
+        }
+        return false;
+    }
+
     // 포인터 이벤트 핸들러
     function onPointerDown(e) {
         const point = getSVGPoint(e.clientX, e.clientY);
+        if (checkCenterHit(point)) return;
         checkHandleHit(point);
     }
 
@@ -348,7 +804,12 @@
         e.preventDefault();
 
         const point = getSVGPoint(e.clientX, e.clientY);
-        updateAngleFromPoint(point);
+
+        if (activeHandle === 'center') {
+            updateCenterFromPoint(point);
+        } else {
+            updateAngleFromPoint(point);
+        }
     }
 
     function onPointerUp() {
@@ -357,21 +818,61 @@
 
     // 터치 이벤트 핸들러
     function onTouchStart(e) {
+        // 핀치 줌 시작 (두 손가락)
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            pinchStartDistance = Math.hypot(
+                touch1.clientX - touch2.clientX,
+                touch1.clientY - touch2.clientY
+            );
+            pinchStartZoom = currentZoom;
+            return;
+        }
+
         if (e.touches.length !== 1) return;
         e.preventDefault();
 
         const touch = e.touches[0];
         const point = getSVGPoint(touch.clientX, touch.clientY);
+        if (checkCenterHit(point)) return;
         checkHandleHit(point);
     }
 
     function onTouchMove(e) {
+        // 핀치 줌 진행 (두 손가락)
+        if (e.touches.length === 2 && pinchStartDistance > 0) {
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDist = Math.hypot(
+                touch1.clientX - touch2.clientX,
+                touch1.clientY - touch2.clientY
+            );
+
+            // 거리 비율에 따른 줌 레벨 계산
+            const scale = currentDist / pinchStartDistance;
+            let newZoom = pinchStartZoom * scale;
+
+            // 범위 제한
+            newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+            applyZoom(newZoom);
+            return;
+        }
+
         if (!isDragging || !activeHandle || e.touches.length !== 1) return;
         e.preventDefault();
 
         const touch = e.touches[0];
         const point = getSVGPoint(touch.clientX, touch.clientY);
-        updateAngleFromPoint(point);
+
+        if (activeHandle === 'center') {
+            updateCenterFromPoint(point);
+        } else {
+            updateAngleFromPoint(point);
+        }
     }
 
     function onTouchEnd() {
@@ -380,6 +881,11 @@
 
     // 핸들 히트 체크
     function checkHandleHit(point) {
+        // 각도 설정 모드에서는 터치로 각도 변경 불가
+        if (measurementMode === 'angle-lock') {
+            return;
+        }
+
         const handle1Pos = {
             x: parseFloat(handle1.getAttribute('cx')),
             y: parseFloat(handle1.getAttribute('cy'))
@@ -390,7 +896,7 @@
         };
 
         // 터치 영역 크게 확대 (iPad에서 쉽게 터치)
-        const hitRadius = 15;
+        const hitRadius = 25;
 
         const dist1 = Math.hypot(point.x - handle1Pos.x, point.y - handle1Pos.y);
         const dist2 = Math.hypot(point.x - handle2Pos.x, point.y - handle2Pos.y);
@@ -398,12 +904,16 @@
         console.log('Touch point:', point, 'Handle1:', handle1Pos, 'Handle2:', handle2Pos);
         console.log('Distances:', dist1, dist2, 'Hit radius:', hitRadius);
 
-        if (dist1 < hitRadius && dist1 <= dist2) {
+        const handle1Visible = handle1.style.display !== 'none';
+
+        if (handle1Visible && dist1 < hitRadius && dist1 <= dist2) {
             console.log('Hit handle 1');
             startDrag(1);
+            updateAngleFromPoint(point);  // 즉시 각도 업데이트
         } else if (dist2 < hitRadius) {
             console.log('Hit handle 2');
             startDrag(2);
+            updateAngleFromPoint(point);  // 즉시 각도 업데이트
         }
     }
 
@@ -411,34 +921,83 @@
         isDragging = true;
         activeHandle = handleNum;
 
-        const group = handleNum === 1 ? line1Group : line2Group;
-        group.classList.add('active');
+        const group = handleNum === 1 ? line1Group : (handleNum === 2 ? line2Group : null);
+        if (group) group.classList.add('active');
+        if (handleNum === 'center') {
+            document.body.style.cursor = 'move';
+        }
     }
 
     function endDrag() {
         if (activeHandle) {
-            const group = activeHandle === 1 ? line1Group : line2Group;
-            group.classList.remove('active');
+            const group = activeHandle === 1 ? line1Group : (activeHandle === 2 ? line2Group : null);
+            if (group) group.classList.remove('active');
         }
+        document.body.style.cursor = '';
 
         isDragging = false;
         activeHandle = null;
     }
 
-    function updateAngleFromPoint(point) {
-        // 중심점에서의 각도 계산
-        const dx = CENTER.x - point.x;
-        const dy = CENTER.y - point.y;
-        let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    function updateCenterFromPoint(point) {
+        currentCenter.x = point.x;
+        currentCenter.y = point.y;
 
-        // 0-180도 범위로 제한
-        if (angle < 0) angle = 0;
-        if (angle > 180) angle = 180;
+        // 각도기 그룹 위치 업데이트
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 모든 라인 및 핸들 업데이트
+        updateLines();
+        updateGravityLine();
+        updateTiltLine();
+    }
+
+    function updateAngleFromPoint(point) {
+        // 각도 설정 모드: handle2를 움직여서 lockedAngle 조정
+        if (measurementMode === 'angle-lock') {
+            if (activeHandle !== 2) return;
+
+            const dx = currentCenter.x - point.x;
+            const dy = currentCenter.y - point.y;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+            // 현재 angle1(수직선)과의 차이를 계산
+            // angle2 = angle1 + lockedAngle  =>  lockedAngle = angle2 - angle1
+            let diff = angle - angle1;
+
+            // 정규화 (-180 ~ 180)
+            while (diff > 180) diff -= 360;
+            while (diff < -180) diff += 360;
+
+            lockedAngle = Math.round(diff); // 정수로 반올림
+
+            // 입력 필드 업데이트
+            angleInput.value = lockedAngle;
+
+            // 라인 업데이트
+            updateLockedAngleLines();
+            return;
+        }
+
+        // 일반 모드: 각도와 거리 모두 업데이트
+        const dx = currentCenter.x - point.x;
+        const dy = currentCenter.y - point.y;
+        let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        let distance = Math.hypot(dx, dy);
+
+        // 각도 범위 제한 제거 - 연장선까지 이동 가능
+        if (angle < -45) angle = -45;
+        if (angle > 225) angle = 225;
+
+        // 거리 범위 제한
+        distance = Math.max(MIN_HANDLE_DISTANCE, Math.min(MAX_HANDLE_DISTANCE, distance));
 
         if (activeHandle === 1) {
             angle1 = angle;
+            handleDistance1 = distance;
         } else {
             angle2 = angle;
+            handleDistance2 = distance;
         }
 
         updateLines();
@@ -466,6 +1025,12 @@
                 await requestOrientationPermission();
                 await startCamera();
                 overlay.remove();
+
+                // 키보드 단축키가 작동하도록 포커스 설정
+                document.body.focus();
+                // tabindex를 설정하여 body가 포커스를 받을 수 있게 함
+                document.body.setAttribute('tabindex', '-1');
+                document.body.focus();
             } catch (err) {
                 console.error('카메라 접근 실패:', err);
                 overlay.querySelector('p').textContent =
@@ -490,6 +1055,79 @@
 
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
+
+        // 전면 카메라일 경우 좌우 반전 (거울 모드)
+        if (facingMode === 'user') {
+            video.style.transform = 'scaleX(-1)';
+        } else {
+            video.style.transform = '';
+        }
+
+        // 줌 기능 확인 및 초기화
+        const track = currentStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        if ('zoom' in capabilities) {
+            minZoom = capabilities.zoom.min;
+            maxZoom = capabilities.zoom.max;
+            // 현재 줌 상태 유지 (또는 minZoom으로 초기화)
+            if (currentZoom < minZoom || currentZoom > maxZoom) {
+                currentZoom = minZoom;
+            }
+            applyZoom(currentZoom);
+            console.log(`줌 기능 지원: ${minZoom} ~ ${maxZoom}`);
+        } else {
+            console.log('줌 기능 미지원');
+        }
+    }
+
+
+
+    // 줌 적용 헬퍼 함수
+    async function applyZoom(zoom) {
+        if (!currentStream) return;
+        if (isApplyingZoom) return; // 이미 적용 중이면 무시 (스로틀링)
+
+        isApplyingZoom = true;
+        try {
+            const track = currentStream.getVideoTracks()[0];
+            await track.applyConstraints({ advanced: [{ zoom: zoom }] });
+            currentZoom = zoom;
+        } catch (err) {
+            console.error('줌 적용 실패:', err);
+        } finally {
+            isApplyingZoom = false;
+        }
+    }
+
+    // 각도 동기화 (일반 모드 상태를 lockedAngle에 반영)
+    function syncLockedAngle() {
+        if (measurementMode === 'normal') {
+            let diff = angle2 - angle1;
+            while (diff > 180) diff -= 360;
+            while (diff < -180) diff += 360;
+            lockedAngle = Math.round(diff);
+        }
+    }
+
+    // 각도 업데이트 및 적용 (모드에 따라 분기)
+    function updateAngleWithLock(newAngle) {
+        lockedAngle = newAngle;
+        angleInput.value = lockedAngle;
+
+        if (measurementMode === 'angle-lock') {
+            updateLockedAngleLines();
+        } else {
+            // 일반 모드: angle1은 그대로 두고 angle2만 변경
+            // angle2 = angle1 + lockedAngle
+            angle2 = angle1 + lockedAngle;
+
+            // angle2 정규화
+            while (angle2 > 180) angle2 -= 180;
+            while (angle2 < 0) angle2 += 180;
+
+            updateLines();
+        }
     }
 
     async function switchCamera() {
@@ -503,4 +1141,19 @@
             facingMode = facingMode === 'environment' ? 'user' : 'environment';
         }
     }
+
+    // 도움말 모달 함수 (전역 노출)
+    window.openHelpModal = function () {
+        const modal = document.getElementById('help-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // 모달이 뜰 때 포커스 해제 (키보드 입력 방지 등)
+            document.activeElement.blur();
+        }
+    };
+
+    window.closeHelpModal = function () {
+        const modal = document.getElementById('help-modal');
+        if (modal) modal.classList.add('hidden');
+    };
 })();
