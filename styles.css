@@ -417,10 +417,6 @@ body {
         left: max(env(safe-area-inset-left, 20px), 20px);
     }
 
-    #switch-camera {
-        /* 미디어 쿼리 스타일 제거됨 (공통 컨테이너에서 처리) */
-    }
-
     #angle-input-panel {
         top: 85px;
         /* 배지와의 간격 확보 */
