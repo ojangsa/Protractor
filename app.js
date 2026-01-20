@@ -54,6 +54,15 @@
     const toggleProtractorBtn = document.getElementById('toggle-protractor');
     let protractorVisible = true; // 각도기 눈금 표시 상태
 
+    // 수직선 토글 버튼
+    const toggleVerticalLineBtn = document.getElementById('toggle-vertical-line');
+    let verticalLineVisible = false; // 수직선 표시 상태 (초기값: 꿄)
+
+    // 카메라 줌 버튼
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const ZOOM_STEP = 0.5; // 버튼 클릭당 줌 변화량
+
     // 상태
     let facingMode = 'environment'; // 후면 카메라 기본
     let currentStream = null;
@@ -116,10 +125,22 @@
         setupDeviceOrientation();
         requestCameraAccess();
 
-        // 기본 모드: 가로 모드
-        toggleOrientationMode();  // 가로 모드로 전환 (portrait -> landscape)
+        // 가로 모드 전용 (세로 모드 비활성화)
+        orientationMode = 'landscape';
+        overlay.setAttribute('viewBox', '0 0 100 100');
+        currentCenter.x = 50;
+        currentCenter.y = 95;
+        const protractorGroup = document.getElementById('protractor-group');
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 화면 방향 가로로 잠금 (회전 방지)
+        lockScreenOrientation('landscape');
         // 일반 모드로 시작 (핸들 드래그 가능, 단 핸들1은 고정)
         handle1.style.display = 'none';
+
+        // 수직선 초기 상태: 꿄
+        line1Group.style.display = 'none';
+        if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
 
         // 키보드 단축키가 바로 작동하도록 포커스 설정
         document.body.focus();
@@ -261,8 +282,20 @@
         // 각도기 눈금 토글
         toggleProtractorBtn.addEventListener('click', toggleProtractor);
 
-        // 가로/세로 모드 전환
-        switchOrientationBtn.addEventListener('click', toggleOrientationMode);
+        // 수직선 토글
+        if (toggleVerticalLineBtn) {
+            toggleVerticalLineBtn.addEventListener('click', toggleVerticalLine);
+        }
+
+        // 카메라 줌 버튼
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', zoomIn);
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', zoomOut);
+        }
+
+        // 가로/세로 모드 전환 버튼 제거됨 (가로 모드 전용)
 
         // 측정 모드 전환
         switchModeBtn.addEventListener('click', toggleMeasurementMode);
@@ -409,6 +442,25 @@
                 e.preventDefault();
                 break;
 
+            // v: 수직선 토글
+            case 'v':
+            case 'V':
+                toggleVerticalLine();
+                e.preventDefault();
+                break;
+
+            // [: 카메라 축소
+            case '[':
+                zoomOut();
+                e.preventDefault();
+                break;
+
+            // ]: 카메라 확대
+            case ']':
+                zoomIn();
+                e.preventDefault();
+                break;
+
             // W, A, S, D: 중심점 이동
             case 'w': case 'W':
             case 'a': case 'A':
@@ -471,8 +523,8 @@
         tiltIndicatorTop.setAttribute('cx', currentCenter.x);
         tiltIndicatorBottom.setAttribute('cx', currentCenter.x);
 
-        // y 위치 설정
-        const lineTop = currentCenter.y - 80;
+        // y 위치 설정 (길이 40으로 축소)
+        const lineTop = currentCenter.y - 40;
         const lineBottom = currentCenter.y;
         tiltLine.setAttribute('y1', lineTop);
         tiltLine.setAttribute('y2', lineBottom);
@@ -509,6 +561,19 @@
             toggleProtractorBtn.classList.add('off');
         }
         console.log('각도기 눈금 표시:', protractorVisible);
+    }
+
+    // 수직선 토글
+    function toggleVerticalLine() {
+        verticalLineVisible = !verticalLineVisible;
+        if (verticalLineVisible) {
+            line1Group.style.display = '';
+            if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.remove('off');
+        } else {
+            line1Group.style.display = 'none';
+            if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
+        }
+        console.log('수직선 표시:', verticalLineVisible);
     }
 
     // DeviceOrientation 설정
@@ -687,7 +752,9 @@
     // 화면 방향 잠금
     function lockScreenOrientation(orientation) {
         if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock(orientation).catch(err => {
+            // landscape-primary: 화면 왼쪽이 아래로 가는 가로 방향
+            const lockOrientation = orientation === 'landscape' ? 'landscape-primary' : orientation;
+            screen.orientation.lock(lockOrientation).catch(err => {
                 console.log('화면 방향 잠금 실패 (PWA 필요):', err.message);
             });
         }
@@ -1098,6 +1165,26 @@
         } finally {
             isApplyingZoom = false;
         }
+    }
+
+    // 줌 인 함수
+    function zoomIn() {
+        if (maxZoom <= 1) {
+            console.log('줌 기능 미지원');
+            return;
+        }
+        const newZoom = Math.min(maxZoom, currentZoom + ZOOM_STEP);
+        applyZoom(newZoom);
+    }
+
+    // 줌 아웃 함수
+    function zoomOut() {
+        if (maxZoom <= 1) {
+            console.log('줌 기능 미지원');
+            return;
+        }
+        const newZoom = Math.max(minZoom, currentZoom - ZOOM_STEP);
+        applyZoom(newZoom);
     }
 
     // 각도 동기화 (일반 모드 상태를 lockedAngle에 반영)
