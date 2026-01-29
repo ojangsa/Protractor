@@ -24,8 +24,8 @@ iPad용 AR 각도기 웹 앱입니다. 카메라를 통해 실제 물체의 각�
 
 ### 로컬 실행
 ```bash
-cd protractor
-python3 -m http.server 8000
+# 프로젝트 폴더로 이동 후
+python -m http.server 8000
 # http://localhost:8000 접속
 ```
 
