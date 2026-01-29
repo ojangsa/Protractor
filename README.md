@@ -29,10 +29,29 @@ python3 -m http.server 8000
 # http://localhost:8000 접속
 ```
 
-### iPad에서 사용
-1. HTTPS 환경 필요 (카메라/센서 API)
-2. Synology NAS Web Station 또는 ngrok 권장
-3. Safari에서 접속 후 카메라/센서 권한 허용
+### GitHub Pages 배포
+
+1. GitHub 저장소의 **Settings** → **Pages** 이동
+2. **Source**를 `Deploy from a branch`로 설정
+3. **Branch**에서 `main` (또는 `master`)과 `/ (root)` 선택
+4. **Save** 클릭
+5. 몇 분 후 `https://[username].github.io/[repository-name]/` 에서 접속 가능
+
+### 모바일에서 앱 설치 (PWA)
+
+#### iOS (아이패드, 아이폰)
+1. Safari로 배포된 URL 접속
+2. 하단 **공유 버튼** (📤) 탭
+3. **"홈 화면에 추가"** 선택
+4. 앱처럼 홈 화면에서 바로 실행 가능
+
+> 💡 처음 접속 시 설치 안내 배너가 자동으로 표시됩니다.
+
+#### Android
+1. Chrome으로 배포된 URL 접속
+2. **"앱 설치"** 버튼 클릭 또는
+3. 메뉴 (⋮) → **"홈 화면에 추가"** 또는 **"앱 설치"** 선택
+
 
 ## 조작법
 

@@ -236,7 +236,120 @@
         </div>
 
     </div> <!-- app-wrapper 끝 -->
+
     <script src="app.js"></script>
+
+    <!-- Service Worker 등록 및 PWA 설치 안내 -->
+    <script>
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker 등록 성공:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 등록 실패:', error);
+                    });
+            });
+        }
+
+        // iOS Safari 설치 안내
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
+        function isInStandaloneMode() {
+            return window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+        }
+
+        // iOS에서 Safari로 접속했고, 아직 설치되지 않은 경우 안내 표시
+        if (isIOS() && !isInStandaloneMode()) {
+            const lastPrompt = localStorage.getItem('iosInstallPromptDismissed');
+            const now = Date.now();
+
+            // 24시간 내에 닫았으면 다시 표시 안 함
+            if (!lastPrompt || (now - parseInt(lastPrompt)) > 24 * 60 * 60 * 1000) {
+                setTimeout(() => {
+                    const banner = document.getElementById('ios-install-banner');
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                    }
+                }, 2000);
+            }
+        }
+
+        function dismissIOSBanner() {
+            const banner = document.getElementById('ios-install-banner');
+            if (banner) {
+                banner.classList.add('hidden');
+                localStorage.setItem('iosInstallPromptDismissed', Date.now().toString());
+            }
+        }
+
+        // Android/Desktop PWA 설치 프롬프트
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // 설치 버튼 표시 (Android/Desktop)
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('PWA 설치됨');
+                    }
+                    deferredPrompt = null;
+                    const installBtn = document.getElementById('pwa-install-btn');
+                    if (installBtn) {
+                        installBtn.classList.add('hidden');
+                    }
+                });
+            }
+        }
+    </script>
+
+    <!-- iOS 설치 안내 배너 -->
+    <div id="ios-install-banner" class="hidden">
+        <div class="ios-install-content">
+            <div class="ios-install-icon">
+                <img src="icon-180.png" alt="앱 아이콘" width="48" height="48">
+            </div>
+            <div class="ios-install-text">
+                <strong>홈 화면에 추가하기</strong>
+                <p>
+                    <span class="share-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                    </span>
+                    공유 버튼 → "홈 화면에 추가" 선택
+                </p>
+            </div>
+            <button class="ios-install-close" onclick="dismissIOSBanner()">×</button>
+        </div>
+    </div>
+
+    <!-- Android/Desktop 설치 버튼 -->
+    <button id="pwa-install-btn" class="hidden" onclick="installPWA()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        앱 설치
+    </button>
 </body>
 
 </html>

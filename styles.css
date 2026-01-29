@@ -136,7 +136,6 @@ body {
 /* 컨트롤 버튼 컨테이너 */
 .controls-container {
     position: fixed;
-    /* 배지 높이(약 56px)와 버튼 높이(44px)의 중앙 정렬을 위해 6px 추가 */
     top: calc(env(safe-area-inset-top, 20px) + 6px);
     right: max(env(safe-area-inset-right, 20px), 20px);
     display: flex;
@@ -150,7 +149,6 @@ body {
 .controls-top-right {
     display: flex;
     flex-direction: row-reverse;
-    /* 카메라 버튼이 가장 오른쪽에 오도록 */
     gap: 8px;
 }
 
@@ -225,7 +223,6 @@ body {
 #switch-orientation,
 #switch-mode {
     width: auto;
-    /* 너비 자동 (공통 스타일 덮어쓰기) */
     padding: 0 14px;
     border-radius: 22px;
     gap: 6px;
@@ -249,7 +246,6 @@ body {
 #reset-center svg {
     color: #333;
 }
-
 
 /* 각도 입력 패널 */
 #angle-input-panel {
@@ -419,9 +415,7 @@ body {
 
     #angle-input-panel {
         top: 85px;
-        /* 배지와의 간격 확보 */
         left: max(env(safe-area-inset-left, 20px), 20px);
-        /* 노치 대응 */
     }
 }
 
@@ -520,4 +514,152 @@ body {
     text-align: right;
     flex: 1;
     margin-left: 12px;
+}
+
+/* iOS 설치 안내 배너 */
+#ios-install-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(30, 30, 30, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 16px 20px;
+    z-index: 3000;
+    animation: slideUp 0.3s ease-out;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#ios-install-banner.hidden {
+    display: none;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.ios-install-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.ios-install-icon img {
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.ios-install-text {
+    flex: 1;
+    color: white;
+}
+
+.ios-install-text strong {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.ios-install-text p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ios-install-text .share-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #007AFF;
+}
+
+.ios-install-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.ios-install-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Android/Desktop PWA 설치 버튼 */
+#pwa-install-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #007AFF 0%, #0051d5 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
+    z-index: 3000;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: fadeIn 0.3s ease-out;
+}
+
+#pwa-install-btn.hidden {
+    display: none;
+}
+
+#pwa-install-btn:hover {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 6px 25px rgba(0, 122, 255, 0.5);
+}
+
+#pwa-install-btn:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
+#pwa-install-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* 일반 hidden 클래스 */
+.hidden {
+    display: none !important;
 }
