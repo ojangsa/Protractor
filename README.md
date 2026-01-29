@@ -1,4 +1,4 @@
-# AR Protractor (AR 각도기)
+# PTNB Protractor (각도기)
 
 iPad용 AR 각도기 웹 앱입니다. 카메라를 통해 실제 물체의 각도를 측정할 수 있습니다.
 
