@@ -1402,17 +1402,21 @@
                         try {
                             await bleAngleCharacteristic.writeValueWithoutResponse(bytes);
                             console.log(`BLE(NR) 각도 전송 성공: ${angle}°`);
+                            writeToDebugLog(`전송(NR) 성공: ${angle}°`, 'success');
                             return;
                         } catch (nrErr) {
                             console.warn('BLE NR 전송 실패, 일반 전송 시도:', nrErr);
+                            writeToDebugLog(`NR 전송 실패: ${nrErr.message}`, 'warn');
                         }
                     }
 
                     // 2. 기존 writeValue (응답 대기) - NR 실패하거나 미지원 시
                     await bleAngleCharacteristic.writeValue(bytes);
                     console.log(`BLE 각도 전송 성공: ${angle}°`);
+                    writeToDebugLog(`전송 성공: ${angle}°`, 'success');
                 } catch (err) {
                     console.error('BLE 각도 전송 오류:', err);
+                    writeToDebugLog(`전송 오류: ${err.message}`, 'error');
                     if (err.message && err.message.includes('GATT')) {
                         handleBLEDisconnect();
                     }
@@ -1448,8 +1452,11 @@
 
     // BLE 연결 시도
     async function connectBLE() {
+        writeToDebugLog('BLE 연결 시도 중...', 'info');
+
         // Web Bluetooth API 지원 확인
         if (!navigator.bluetooth) {
+            writeToDebugLog('Web Bluetooth 미지원 브라우저', 'error');
             showESP32Message('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.', 'error');
             return;
         }
@@ -1459,10 +1466,13 @@
 
         try {
             // 블루투스 장치 요청 - 모든 장치 표시 (호환성 우선)
+            writeToDebugLog('장치 검색 요청 (acceptAllDevices)...', 'info');
             bleDevice = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: [BLE_SERVICE_UUID]
             });
+
+            writeToDebugLog(`장치 선택됨: ${bleDevice.name} (${bleDevice.id})`, 'success');
 
             showESP32Message('장치 연결 중...', 'info');
 
@@ -1470,13 +1480,18 @@
             bleDevice.addEventListener('gattserverdisconnected', handleBLEDisconnect);
 
             // GATT 서버 연결
+            writeToDebugLog('GATT 서버 연결 중...', 'info');
             bleServer = await bleDevice.gatt.connect();
+            writeToDebugLog('GATT 서버 연결 성공', 'success');
 
             // 서비스 가져오기
+            writeToDebugLog(`서비스 검색: ${BLE_SERVICE_UUID}`, 'info');
             const service = await bleServer.getPrimaryService(BLE_SERVICE_UUID);
 
             // 각도 특성 가져오기
+            writeToDebugLog('각도 특성 가져오는 중...', 'info');
             bleAngleCharacteristic = await service.getCharacteristic(BLE_ANGLE_CHAR_UUID);
+            writeToDebugLog('각도 특성 획득 성공', 'success');
 
             // 연결 성공
             bleConnected = true;
@@ -1600,11 +1615,40 @@
         }
     }
 
+    // 디버그 로그 함수
+    function writeToDebugLog(message, type = 'info') {
+        const debugConsole = document.getElementById('debug-console');
+        const debugLog = document.getElementById('debug-log');
+
+        if (debugConsole && debugLog) {
+            debugConsole.style.display = 'block'; // 로그 발생 시 콘솔 표시
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+
+            const time = new Date().toLocaleTimeString().split(' ')[0]; // 시:분:초 만
+            entry.textContent = `[${time}] ${message}`;
+
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+        console.log(`[Debug] ${message}`);
+    }
+
+    function clearDebugLog() {
+        const debugLog = document.getElementById('debug-log');
+        if (debugLog) debugLog.innerHTML = '';
+    }
+
     // ESP32 모달 열기/닫기 (전역 노출)
     window.openESP32Modal = function () {
         if (esp32Modal) {
             esp32Modal.classList.remove('hidden');
             document.activeElement.blur();
+
+            // 모달 열 때 디버그 콘솔 표시
+            const debugConsole = document.getElementById('debug-console');
+            if (debugConsole) debugConsole.style.display = 'block';
         }
     };
 
@@ -1621,6 +1665,10 @@
     // BLE 연결 함수 (전역 노출)
     window.connectBLE = connectBLE;
     window.disconnectBLE = disconnectBLE;
+
+    // 디버그 함수 노출
+    window.writeToDebugLog = writeToDebugLog;
+    window.clearDebugLog = clearDebugLog;
 
     // ESP32 버튼 클릭 이벤트 (모달 열기)
     if (esp32ConnectBtn) {

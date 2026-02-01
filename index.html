@@ -313,6 +313,15 @@
                         </button>
                     </div>
 
+                    <!-- 디버그 콘솔 -->
+                    <div id="debug-console" class="debug-console" style="display: none;">
+                        <div class="debug-header">
+                            <span>디버그 로그 (v1.1)</span>
+                            <button onclick="clearDebugLog()">지우기</button>
+                        </div>
+                        <div id="debug-log" class="debug-log"></div>
+                    </div>
+
                     <div id="esp32-message" class="esp32-message hidden"></div>
                 </div>
             </div>
