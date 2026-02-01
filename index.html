@@ -45,6 +45,17 @@
         <div class="controls-container">
             <!-- 상단 우측 가로 배열 그룹 -->
             <div class="controls-top-right">
+                <!-- ESP32 연결 버튼 -->
+                <button id="esp32-connect" class="esp32-btn" aria-label="ESP32 서보 연결">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="currentColor" />
+                    </svg>
+                    <span id="esp32-status-dot" class="status-dot disconnected"></span>
+                </button>
+
                 <!-- 각도기 눈금 토글 버튼 -->
                 <button id="toggle-protractor" aria-label="각도기 눈금 표시 토글">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -231,6 +242,52 @@
                         <span class="key">0-9</span>
                         <span class="desc">각도 즉시 설정 (10~50, -10~-50)</span>
                     </div>
+                    <div class="shortcut-item">
+                        <span class="key">E</span>
+                        <span class="desc">ESP32 서보 연결 설정</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESP32 설정 모달 -->
+        <div id="esp32-modal" class="modal hidden" onclick="if(event.target === this) closeESP32Modal()">
+            <div class="modal-content esp32-modal-content">
+                <div class="modal-header">
+                    <h2>📡 ESP32 서보 연결</h2>
+                    <button class="close-btn" onclick="closeESP32Modal()">&times;</button>
+                </div>
+                <div class="esp32-info">
+                    <div class="esp32-status-card" id="esp32-connection-status">
+                        <div class="status-icon disconnected">●</div>
+                        <span>연결 안됨</span>
+                    </div>
+
+                    <div class="esp32-instructions">
+                        <h3>연결 방법</h3>
+                        <ol>
+                            <li>ESP32에 아두이노 코드 업로드</li>
+                            <li>기기 WiFi 설정에서 연결:
+                                <div class="wifi-info">
+                                    <strong>SSID:</strong> Protractor-Servo<br>
+                                    <strong>비밀번호:</strong> 12345678
+                                </div>
+                            </li>
+                            <li>아래 연결 버튼 클릭</li>
+                        </ol>
+                    </div>
+
+                    <div class="esp32-actions">
+                        <button id="esp32-test-btn" class="esp32-action-btn" onclick="testESP32Connection()">
+                            연결 테스트
+                        </button>
+                        <button id="esp32-disconnect-btn" class="esp32-action-btn secondary hidden"
+                            onclick="disconnectESP32()">
+                            연결 해제
+                        </button>
+                    </div>
+
+                    <div id="esp32-message" class="esp32-message hidden"></div>
                 </div>
             </div>
         </div>

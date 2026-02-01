@@ -663,3 +663,199 @@ body {
 .hidden {
     display: none !important;
 }
+
+/* ===== ESP32 연결 버튼 스타일 ===== */
+.esp32-btn {
+    position: relative;
+}
+
+.esp32-btn svg {
+    color: #007AFF;
+}
+
+.esp32-btn.connected svg {
+    color: #34C759;
+}
+
+/* 연결 상태 도트 인디케이터 */
+.status-dot {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.status-dot.disconnected {
+    background: #FF3B30;
+}
+
+.status-dot.connected {
+    background: #34C759;
+    animation: pulse-green 2s infinite;
+}
+
+.status-dot.connecting {
+    background: #FF9500;
+    animation: pulse-orange 1s infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(52, 199, 89, 0);
+    }
+}
+
+@keyframes pulse-orange {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ===== ESP32 설정 모달 ===== */
+.esp32-modal-content {
+    max-width: 360px;
+}
+
+.esp32-info {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.esp32-status-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.esp32-status-card .status-icon {
+    font-size: 24px;
+}
+
+.esp32-status-card .status-icon.disconnected {
+    color: #FF3B30;
+}
+
+.esp32-status-card .status-icon.connected {
+    color: #34C759;
+}
+
+.esp32-status-card .status-icon.connecting {
+    color: #FF9500;
+    animation: pulse-orange 1s infinite;
+}
+
+.esp32-instructions {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.esp32-instructions h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.esp32-instructions ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.wifi-info {
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(0, 122, 255, 0.2);
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.wifi-info strong {
+    color: #FFD700;
+}
+
+.esp32-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.esp32-action-btn {
+    flex: 1;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.esp32-action-btn:not(.secondary) {
+    background: linear-gradient(135deg, #007AFF 0%, #0051d5 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+}
+
+.esp32-action-btn:not(.secondary):hover {
+    background: linear-gradient(135deg, #0066CC 0%, #0040a8 100%);
+}
+
+.esp32-action-btn.secondary {
+    background: rgba(255, 59, 48, 0.2);
+    color: #FF3B30;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.esp32-action-btn.secondary:hover {
+    background: rgba(255, 59, 48, 0.3);
+}
+
+.esp32-action-btn:active {
+    transform: scale(0.96);
+}
+
+.esp32-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.esp32-message.success {
+    background: rgba(52, 199, 89, 0.2);
+    color: #34C759;
+    border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.esp32-message.error {
+    background: rgba(255, 59, 48, 0.2);
+    color: #FF3B30;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.esp32-message.info {
+    background: rgba(0, 122, 255, 0.2);
+    color: #007AFF;
+    border: 1px solid rgba(0, 122, 255, 0.3);
+}

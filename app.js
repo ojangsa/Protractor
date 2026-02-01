@@ -113,6 +113,22 @@
     let pinchStartZoom = 1;
     let isApplyingZoom = false; // 줌 적용 중 플래그 (스로틀링용)
 
+    // ESP32 서보 모터 제어 관련
+    const ESP32_IP = '192.168.4.1'; // ESP32 AP 모드 기본 IP
+    const ESP32_PORT = 80;
+    let esp32Connected = false;
+    let esp32SendTimeout = null;
+    const ESP32_SEND_DEBOUNCE = 50; // 각도 전송 디바운스 시간 (ms)
+
+    // ESP32 DOM 요소
+    const esp32ConnectBtn = document.getElementById('esp32-connect');
+    const esp32StatusDot = document.getElementById('esp32-status-dot');
+    const esp32Modal = document.getElementById('esp32-modal');
+    const esp32ConnectionStatus = document.getElementById('esp32-connection-status');
+    const esp32TestBtn = document.getElementById('esp32-test-btn');
+    const esp32DisconnectBtn = document.getElementById('esp32-disconnect-btn');
+    const esp32Message = document.getElementById('esp32-message');
+
     // 초기화
     init();
 
@@ -479,6 +495,13 @@
                 updateCenterFromPoint(newCenter);
                 e.preventDefault();
                 break;
+
+            // E: ESP32 서보 연결 모달 열기
+            case 'e':
+            case 'E':
+                window.openESP32Modal();
+                e.preventDefault();
+                break;
         }
     }
 
@@ -501,6 +524,9 @@
         while (angle2 < 0) angle2 += 180;
 
         updateLines();
+
+        // ESP32 서보 모터로 각도 전송
+        sendAngleToESP32(lockedAngle);
     }
 
     // 수평 기준선 업데이트 (좌우 기울기)
@@ -1214,6 +1240,9 @@
             while (angle2 < 0) angle2 += 180;
 
             updateLines();
+
+            // ESP32 서보 모터로 각도 전송
+            sendAngleToESP32(lockedAngle);
         }
     }
 
@@ -1243,4 +1272,179 @@
         const modal = document.getElementById('help-modal');
         if (modal) modal.classList.add('hidden');
     };
+
+    // ===== ESP32 서보 모터 제어 함수들 =====
+
+    // ESP32 연결 테스트
+    async function testESP32Connection() {
+        updateESP32Status('connecting');
+        showESP32Message('연결 테스트 중...', 'info');
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/status`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                esp32Connected = true;
+                updateESP32Status('connected');
+                showESP32Message(`연결 성공! 현재 각도: ${data.angle}°`, 'success');
+                console.log('ESP32 연결됨:', data);
+
+                // 현재 각도 동기화
+                sendAngleToESP32(lockedAngle);
+            } else {
+                throw new Error('응답 오류');
+            }
+        } catch (err) {
+            esp32Connected = false;
+            updateESP32Status('disconnected');
+
+            if (err.name === 'AbortError') {
+                showESP32Message('연결 시간 초과. WiFi 연결을 확인하세요.', 'error');
+            } else {
+                showESP32Message('연결 실패. ESP32 WiFi에 연결되어 있는지 확인하세요.', 'error');
+            }
+            console.error('ESP32 연결 실패:', err);
+        }
+    }
+
+    // ESP32 연결 해제
+    function disconnectESP32() {
+        esp32Connected = false;
+        updateESP32Status('disconnected');
+        showESP32Message('연결이 해제되었습니다.', 'info');
+        console.log('ESP32 연결 해제');
+    }
+
+    // ESP32로 각도 전송 (디바운스 적용)
+    function sendAngleToESP32(angle) {
+        if (!esp32Connected) return;
+
+        // 디바운스: 이전 타이머 취소
+        if (esp32SendTimeout) {
+            clearTimeout(esp32SendTimeout);
+        }
+
+        esp32SendTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`ESP32 각도 전송 성공: ${angle}° → 서보: ${data.servoAngle}°`);
+                } else {
+                    console.error('ESP32 각도 전송 실패:', response.status);
+                }
+            } catch (err) {
+                console.error('ESP32 각도 전송 오류:', err);
+                // 연결 끊김 감지
+                if (esp32Connected) {
+                    esp32Connected = false;
+                    updateESP32Status('disconnected');
+                }
+            }
+        }, ESP32_SEND_DEBOUNCE);
+    }
+
+    // ESP32 상태 UI 업데이트
+    function updateESP32Status(status) {
+        // 버튼 상태 도트
+        if (esp32StatusDot) {
+            esp32StatusDot.className = 'status-dot ' + status;
+        }
+
+        // 버튼 클래스
+        if (esp32ConnectBtn) {
+            if (status === 'connected') {
+                esp32ConnectBtn.classList.add('connected');
+            } else {
+                esp32ConnectBtn.classList.remove('connected');
+            }
+        }
+
+        // 모달 내 상태 카드
+        if (esp32ConnectionStatus) {
+            const statusIcon = esp32ConnectionStatus.querySelector('.status-icon');
+            const statusText = esp32ConnectionStatus.querySelector('span');
+
+            if (statusIcon) {
+                statusIcon.className = 'status-icon ' + status;
+            }
+
+            if (statusText) {
+                switch (status) {
+                    case 'connected':
+                        statusText.textContent = '연결됨';
+                        break;
+                    case 'connecting':
+                        statusText.textContent = '연결 중...';
+                        break;
+                    default:
+                        statusText.textContent = '연결 안됨';
+                }
+            }
+        }
+
+        // 버튼 표시/숨김
+        if (esp32TestBtn && esp32DisconnectBtn) {
+            if (status === 'connected') {
+                esp32TestBtn.classList.add('hidden');
+                esp32DisconnectBtn.classList.remove('hidden');
+            } else {
+                esp32TestBtn.classList.remove('hidden');
+                esp32DisconnectBtn.classList.add('hidden');
+            }
+        }
+    }
+
+    // ESP32 메시지 표시
+    function showESP32Message(message, type) {
+        if (esp32Message) {
+            esp32Message.textContent = message;
+            esp32Message.className = 'esp32-message ' + type;
+            esp32Message.classList.remove('hidden');
+
+            // 성공/오류 메시지는 5초 후 자동 숨김
+            if (type !== 'info') {
+                setTimeout(() => {
+                    esp32Message.classList.add('hidden');
+                }, 5000);
+            }
+        }
+    }
+
+    // ESP32 모달 열기/닫기 (전역 노출)
+    window.openESP32Modal = function () {
+        if (esp32Modal) {
+            esp32Modal.classList.remove('hidden');
+            document.activeElement.blur();
+        }
+    };
+
+    window.closeESP32Modal = function () {
+        if (esp32Modal) {
+            esp32Modal.classList.add('hidden');
+        }
+    };
+
+    // ESP32 연결 테스트 (전역 노출)
+    window.testESP32Connection = testESP32Connection;
+    window.disconnectESP32 = disconnectESP32;
+
+    // ESP32 버튼 클릭 이벤트 (모달 열기)
+    if (esp32ConnectBtn) {
+        esp32ConnectBtn.addEventListener('click', () => {
+            window.openESP32Modal();
+        });
+    }
 })();
