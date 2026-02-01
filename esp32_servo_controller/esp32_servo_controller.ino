@@ -142,8 +142,6 @@ void setup() {
   // 웹서버 라우트 설정
   server.on("/", handleRoot);
   server.on("/index.html", handleRoot);
-  server.on("/styles.css", handleStyles);
-  server.on("/app.js", handleAppJS);
   server.on("/angle", handleAngle);
   server.on("/status", handleStatus);
   server.onNotFound(handleNotFound);
@@ -256,22 +254,10 @@ void handleCORS() {
 }
 
 // 루트 페이지
-// 루트 페이지 (Embeded Index HTML)
+// 루트 페이지 (Merged Index HTML)
 void handleRoot() {
   addCORSHeaders();
   server.send(200, "text/html", index_html);
-}
-
-// 스타일 시트 (Embeded CSS)
-void handleStyles() {
-  addCORSHeaders();
-  server.send(200, "text/css", styles_css);
-}
-
-// 앱 스크립트 (Embeded JS)
-void handleAppJS() {
-  addCORSHeaders();
-  server.send(200, "application/javascript", app_js);
 }
 
 // 각도 설정 엔드포인트

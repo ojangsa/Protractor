@@ -2,6 +2,20 @@
 <html lang="ko">
 
 <head>
+    <!-- 초기 에러 핸들러 (인라인) -->
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            var statusDiv = document.getElementById('js-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'js-status';
+                statusDiv.style.cssText = "position:fixed; top:5px; left:5px; z-index:9999; color:red; background:white; padding:5px; border:2px solid red; font-weight:bold;";
+                document.body.appendChild(statusDiv);
+            }
+            statusDiv.innerHTML = "JS Error: " + msg + "<br>Line: " + line;
+            return false;
+        };
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">

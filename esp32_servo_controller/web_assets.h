@@ -1,11 +1,26 @@
 #ifndef WEB_ASSETS_H
 #define WEB_ASSETS_H
 
+// Merged HTML (index.html + styles.css + app.js)
 const char* index_html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="ko">
 
 <head>
+    <!-- 초기 에러 핸들러 (인라인) -->
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            var statusDiv = document.getElementById('js-status');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'js-status';
+                statusDiv.style.cssText = "position:fixed; top:5px; left:5px; z-index:9999; color:red; background:white; padding:5px; border:2px solid red; font-weight:bold;";
+                document.body.appendChild(statusDiv);
+            }
+            statusDiv.innerHTML = "JS Error: " + msg + "<br>Line: " + line;
+            return false;
+        };
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -22,442 +37,7 @@ const char* index_html = R"rawliteral(
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 
-    <link rel="stylesheet" href="styles.css">
-</head>
-
-<body>
-    <!-- JS 로드 상태 표시 (디버깅용) -->
-    <div id="js-status"
-        style="position:fixed; top:5px; left:5px; z-index:9999; color:red; background:white; padding:2px; font-weight:bold;">
-        JS Initializing...
-    </div>
-
-    <!-- 앱 전체 래퍼 (화면 회전 보정용) -->
-    <div id="app-wrapper">
-        <!-- 카메라 비디오 피드 -->
-        <video id="camera" autoplay playsinline></video>
-
-        <!-- 각도 표시 배지 -->
-        <div id="angle-badge">
-            <span id="angle-value">0</span>°
-            <span id="level-ok" class="hidden">✓</span>
-            <span id="tilt-ok" class="hidden">✓</span>
-        </div>
-
-        <!-- 각도 입력 패널 -->
-        <div id="angle-input-panel" class="hidden">
-            <label for="angle-input">각도:</label>
-            <input type="number" id="angle-input" min="-180" max="180" value="45" step="1" />
-            <span>°</span>
-        </div>
-
-        <!-- 컨트롤 버튼 컨테이너 -->
-        <div class="controls-container">
-            <!-- 상단 우측 가로 배열 그룹 -->
-            <div class="controls-top-right">
-                <!-- ESP32 연결 버튼 -->
-                <button id="esp32-connect" class="esp32-btn" aria-label="ESP32 서보 연결">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                        <circle cx="12" cy="20" r="1" fill="currentColor" />
-                    </svg>
-                    <span id="esp32-status-dot" class="status-dot disconnected"></span>
-                </button>
-
-                <!-- 각도기 눈금 토글 버튼 -->
-                <button id="toggle-protractor" aria-label="각도기 눈금 표시 토글">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12" />
-                        <path d="M2 12h10" />
-                        <path d="M12 12V2" />
-                    </svg>
-                </button>
-
-                <!-- 수직선 토글 버튼 -->
-                <button id="toggle-vertical-line" aria-label="수직선 표시 토글">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="2" x2="12" y2="22" />
-                    </svg>
-                </button>
-
-                <!-- 기울기선 토글 버튼 -->
-                <button id="toggle-tilt-line" aria-label="기울기선 표시 토글">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="2" x2="12" y2="22" />
-                        <circle cx="12" cy="5" r="2" />
-                        <circle cx="12" cy="19" r="2" />
-                    </svg>
-                </button>
-
-                <!-- 카메라 전환 버튼 -->
-                <button id="switch-camera" aria-label="카메라 전환">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                        <path d="M17 8l2-2M17 6l2 2" />
-                    </svg>
-                </button>
-            </div>
-
-            <!-- 우측 세로 배열 그룹 -->
-            <div class="controls-right-column">
-                <!-- 측정 모드 전환 버튼 -->
-                <button id="switch-mode" aria-label="측정 모드 전환">
-                    <svg id="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2v20M2 12h20" />
-                    </svg>
-                    <span id="mode-label">일반</span>
-                </button>
-
-                <!-- 중심점 리셋 버튼 -->
-                <button id="reset-center" aria-label="중심점 리셋">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                        <circle cx="12" cy="12" r="2" fill="currentColor" />
-                    </svg>
-                </button>
-
-                <!-- 카메라 확대 버튼 -->
-                <button id="zoom-in-btn" aria-label="카메라 확대">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                        <line x1="11" y1="8" x2="11" y2="14" />
-                        <line x1="8" y1="11" x2="14" y2="11" />
-                    </svg>
-                </button>
-
-                <!-- 카메라 축소 버튼 -->
-                <button id="zoom-out-btn" aria-label="카메라 축소">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                        <line x1="8" y1="11" x2="14" y2="11" />
-                    </svg>
-                </button>
-
-                <!-- 단축키 도움말 버튼 -->
-                <button id="help-btn" class="control-btn" aria-label="단축키 도움말" onclick="openHelpModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- SVG 오버레이 -->
-        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
-            <!-- 각도기 그룹 (하단 중앙) -->
-            <g id="protractor-group" transform="translate(50, 95)">
-                <!-- 각도기 배경 (투명하게, 축소) -->
-                <path id="protractor-bg" d="M -20 0 A 20 20 0 0 1 20 0 L 17.5 0 A 17.5 17.5 0 0 0 -17.5 0 Z"
-                    fill="rgba(0, 0, 0, 0.3)" stroke="rgba(255, 255, 255, 0.5)" stroke-width="0.2" />
-
-                <!-- 눈금 -->
-                <g id="tick-marks"></g>
-
-                <!-- 중앙점 -->
-                <circle cx="0" cy="0" r="0.75" fill="rgba(255, 255, 255, 0.8)" />
-            </g>
-
-            <!-- 기준선 1 (수직) -->
-            <g id="line1-group" class="line-group">
-                <line id="line1" x1="50" y1="85" x2="50" y2="25" stroke="#007AFF" stroke-width="0.3"
-                    stroke-linecap="round" />
-                <line id="line1-ext" x1="50" y1="25" x2="50" y2="0" stroke="#007AFF" stroke-width="0.3"
-                    stroke-linecap="round" />
-                <circle id="handle1" cx="50" cy="25" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
-            </g>
-
-            <!-- 기준선 2 (기울어진) -->
-            <g id="line2-group" class="line-group">
-                <line id="line2" x1="50" y1="85" x2="75" y2="35" stroke="#007AFF" stroke-width="0.4"
-                    stroke-linecap="round" />
-                <line id="line2-ext" x1="75" y1="35" x2="90" y2="5" stroke="#007AFF" stroke-width="0.4"
-                    stroke-linecap="round" />
-                <circle id="handle2" cx="75" cy="35" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
-            </g>
-
-            <!-- 수평 기준선 (좌우 기울기 - 녹색) -->
-            <g id="gravity-line-group">
-                <line id="gravity-line" x1="10" y1="95" x2="90" y2="95" stroke="#34C759" stroke-width="0.6"
-                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
-                <circle id="gravity-indicator-left" cx="10" cy="95" r="1.5" fill="#34C759" />
-                <circle id="gravity-indicator-right" cx="90" cy="95" r="1.5" fill="#34C759" />
-            </g>
-
-            <!-- 수직 기준선 (앞뒤 기울기 - 주황색) -->
-            <g id="tilt-line-group">
-                <line id="tilt-line" x1="50" y1="30" x2="50" y2="70" stroke="#FF9500" stroke-width="0.6"
-                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
-                <circle id="tilt-indicator-top" cx="50" cy="30" r="1.5" fill="#FF9500" />
-                <circle id="tilt-indicator-bottom" cx="50" cy="70" r="1.5" fill="#FF9500" />
-            </g>
-        </svg>
-
-        <!-- 단축키 도움말 모달 -->
-        <div id="help-modal" class="modal hidden" onclick="if(event.target === this) closeHelpModal()">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>단축키 안내</h2>
-                    <button id="close-help" class="close-btn" onclick="closeHelpModal()">&times;</button>
-                </div>
-                <div class="shortcut-list">
-                    <div class="shortcut-item">
-                        <span class="key">M</span>
-                        <span class="desc">일반 / 각도설정 모드 전환</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">R</span>
-                        <span class="desc">중심점 리셋</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">F</span>
-                        <span class="desc">각도기 눈금 켜기/끄기</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">;</span>
-                        <span class="desc">기울기 지시선 켜기/끄기</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">V</span>
-                        <span class="desc">수직선 켜기/끄기</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">/</span>
-                        <span class="desc">전후면 카메라 전환</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">[ ]</span>
-                        <span class="desc">카메라 축소 / 확대</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">W, A, S, D</span>
-                        <span class="desc">중심점 이동 (Shift: 빠르게)</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">. ,</span>
-                        <span class="desc">각도 조절 (+1, -1)</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">&gt; &lt;</span>
-                        <span class="desc">각도 조절 (+10, -10)</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">0-9</span>
-                        <span class="desc">각도 즉시 설정 (10~50, -10~-50)</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="key">E</span>
-                        <span class="desc">ESP32 서보 연결 설정</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ESP32 설정 모달 -->
-        <div id="esp32-modal" class="modal hidden" onclick="if(event.target === this) closeESP32Modal()">
-            <div class="modal-content esp32-modal-content">
-                <div class="modal-header">
-                    <h2>📡 ESP32 서보 연결</h2>
-                    <button class="close-btn" onclick="closeESP32Modal()">&times;</button>
-                </div>
-                <div class="esp32-info">
-                    <div class="esp32-status-card" id="esp32-connection-status">
-                        <div class="status-icon disconnected">●</div>
-                        <span>연결 안됨</span>
-                    </div>
-
-                    <div class="esp32-instructions">
-                        <h3>연결 방법</h3>
-                        <ol>
-                            <li>ESP32에 아두이노 코드 업로드</li>
-                            <li>기기 WiFi 설정에서 연결:
-                                <div class="wifi-info">
-                                    <strong>SSID:</strong> Protractor-Servo<br>
-                                    <strong>비밀번호:</strong> 12345678
-                                </div>
-                            </li>
-                            <li>아래 연결 버튼 클릭</li>
-                        </ol>
-                    </div>
-
-                    <!-- HTTPS 제한 안내 및 블루투스 옵션 -->
-                    <div class="esp32-connection-options">
-                        <!-- 블루투스 연결 (HTTPS에서도 작동) -->
-                        <div class="esp32-ble-section">
-                            <p>🔵 <strong>블루투스 연결</strong> (권장)</p>
-                            <p class="ble-desc">HTTPS에서도 작동합니다. Chrome/Edge 필요.</p>
-                            <button class="esp32-action-btn ble-btn" onclick="connectBLE()">
-                                🔵 블루투스 연결
-                            </button>
-                        </div>
-
-                        <div class="esp32-divider">
-                            <span>또는</span>
-                        </div>
-
-                        <!-- WiFi 연결 -->
-                        <div class="esp32-wifi-section">
-                            <p>📡 <strong>WiFi 연결</strong></p>
-                            <p class="wifi-desc">HTTP 환경에서만 작동합니다.</p>
-                            <div class="esp32-actions">
-                                <button id="esp32-test-btn" class="esp32-action-btn wifi-btn"
-                                    onclick="testESP32Connection()">
-                                    📡 WiFi 연결 테스트
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 연결 해제 버튼 -->
-                    <div class="esp32-actions disconnect-section">
-                        <button id="esp32-disconnect-btn" class="esp32-action-btn secondary hidden"
-                            onclick="disconnectESP32(); disconnectBLE();">
-                            연결 해제
-                        </button>
-                    </div>
-
-                    <!-- 디버그 콘솔 -->
-                    <div id="debug-console" class="debug-console" style="display: none;">
-                        <div class="debug-header">
-                            <span>디버그 로그 (v1.1)</span>
-                            <button onclick="clearDebugLog()">지우기</button>
-                        </div>
-                        <div id="debug-log" class="debug-log"></div>
-                    </div>
-
-                    <div id="esp32-message" class="esp32-message hidden"></div>
-                </div>
-            </div>
-        </div>
-
-    </div> <!-- app-wrapper 끝 -->
-
-    <script src="app.js"></script>
-
-    <!-- Service Worker 등록 및 PWA 설치 안내 -->
-    <script>
-        // Service Worker 등록
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then((registration) => {
-                        console.log('Service Worker 등록 성공:', registration.scope);
-                    })
-                    .catch((error) => {
-                        console.log('Service Worker 등록 실패:', error);
-                    });
-            });
-        }
-
-        // iOS Safari 설치 안내
-        function isIOS() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        }
-
-        function isInStandaloneMode() {
-            return window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-        }
-
-        // iOS에서 Safari로 접속했고, 아직 설치되지 않은 경우 안내 표시
-        if (isIOS() && !isInStandaloneMode()) {
-            const lastPrompt = localStorage.getItem('iosInstallPromptDismissed');
-            const now = Date.now();
-
-            // 24시간 내에 닫았으면 다시 표시 안 함
-            if (!lastPrompt || (now - parseInt(lastPrompt)) > 24 * 60 * 60 * 1000) {
-                setTimeout(() => {
-                    const banner = document.getElementById('ios-install-banner');
-                    if (banner) {
-                        banner.classList.remove('hidden');
-                    }
-                }, 2000);
-            }
-        }
-
-        function dismissIOSBanner() {
-            const banner = document.getElementById('ios-install-banner');
-            if (banner) {
-                banner.classList.add('hidden');
-                localStorage.setItem('iosInstallPromptDismissed', Date.now().toString());
-            }
-        }
-
-        // Android/Desktop PWA 설치 프롬프트
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-
-            // 설치 버튼 표시 (Android/Desktop)
-            const installBtn = document.getElementById('pwa-install-btn');
-            if (installBtn) {
-                installBtn.classList.remove('hidden');
-            }
-        });
-
-        function installPWA() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('PWA 설치됨');
-                    }
-                    deferredPrompt = null;
-                    const installBtn = document.getElementById('pwa-install-btn');
-                    if (installBtn) {
-                        installBtn.classList.add('hidden');
-                    }
-                });
-            }
-        }
-    </script>
-
-    <!-- iOS 설치 안내 배너 -->
-    <div id="ios-install-banner" class="hidden">
-        <div class="ios-install-content">
-            <div class="ios-install-icon">
-                <img src="icon-180.png" alt="앱 아이콘" width="48" height="48">
-            </div>
-            <div class="ios-install-text">
-                <strong>홈 화면에 추가하기</strong>
-                <p>
-                    <span class="share-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                            <polyline points="16 6 12 2 8 6" />
-                            <line x1="12" y1="2" x2="12" y2="15" />
-                        </svg>
-                    </span>
-                    공유 버튼 → "홈 화면에 추가" 선택
-                </p>
-            </div>
-            <button class="ios-install-close" onclick="dismissIOSBanner()">×</button>
-        </div>
-    </div>
-
-    <!-- Android/Desktop 설치 버튼 -->
-    <button id="pwa-install-btn" class="hidden" onclick="installPWA()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        앱 설치
-    </button>
-</body>
-
-</html>
-)rawliteral";
-
-const char* styles_css = R"rawliteral(
+    <style>
 * {
     margin: 0;
     padding: 0;
@@ -1523,9 +1103,324 @@ body {
 .log-info {
     color: #54a0ff;
 }
-)rawliteral";
+</style>
+</head>
 
-const char* app_js = R"rawliteral(
+<body>
+    <!-- JS 로드 상태 표시 (디버깅용) -->
+    <div id="js-status"
+        style="position:fixed; top:5px; left:5px; z-index:9999; color:red; background:white; padding:2px; font-weight:bold;">
+        JS Initializing...
+    </div>
+
+    <!-- 앱 전체 래퍼 (화면 회전 보정용) -->
+    <div id="app-wrapper">
+        <!-- 카메라 비디오 피드 -->
+        <video id="camera" autoplay playsinline></video>
+
+        <!-- 각도 표시 배지 -->
+        <div id="angle-badge">
+            <span id="angle-value">0</span>°
+            <span id="level-ok" class="hidden">✓</span>
+            <span id="tilt-ok" class="hidden">✓</span>
+        </div>
+
+        <!-- 각도 입력 패널 -->
+        <div id="angle-input-panel" class="hidden">
+            <label for="angle-input">각도:</label>
+            <input type="number" id="angle-input" min="-180" max="180" value="45" step="1" />
+            <span>°</span>
+        </div>
+
+        <!-- 컨트롤 버튼 컨테이너 -->
+        <div class="controls-container">
+            <!-- 상단 우측 가로 배열 그룹 -->
+            <div class="controls-top-right">
+                <!-- ESP32 연결 버튼 -->
+                <button id="esp32-connect" class="esp32-btn" aria-label="ESP32 서보 연결">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="currentColor" />
+                    </svg>
+                    <span id="esp32-status-dot" class="status-dot disconnected"></span>
+                </button>
+
+                <!-- 각도기 눈금 토글 버튼 -->
+                <button id="toggle-protractor" aria-label="각도기 눈금 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12" />
+                        <path d="M2 12h10" />
+                        <path d="M12 12V2" />
+                    </svg>
+                </button>
+
+                <!-- 수직선 토글 버튼 -->
+                <button id="toggle-vertical-line" aria-label="수직선 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="2" x2="12" y2="22" />
+                    </svg>
+                </button>
+
+                <!-- 기울기선 토글 버튼 -->
+                <button id="toggle-tilt-line" aria-label="기울기선 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="2" x2="12" y2="22" />
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 전환 버튼 -->
+                <button id="switch-camera" aria-label="카메라 전환">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                        <path d="M17 8l2-2M17 6l2 2" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 우측 세로 배열 그룹 -->
+            <div class="controls-right-column">
+                <!-- 측정 모드 전환 버튼 -->
+                <button id="switch-mode" aria-label="측정 모드 전환">
+                    <svg id="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M2 12h20" />
+                    </svg>
+                    <span id="mode-label">일반</span>
+                </button>
+
+                <!-- 중심점 리셋 버튼 -->
+                <button id="reset-center" aria-label="중심점 리셋">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                        <circle cx="12" cy="12" r="2" fill="currentColor" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 확대 버튼 -->
+                <button id="zoom-in-btn" aria-label="카메라 확대">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                        <line x1="11" y1="8" x2="11" y2="14" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 축소 버튼 -->
+                <button id="zoom-out-btn" aria-label="카메라 축소">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                </button>
+
+                <!-- 단축키 도움말 버튼 -->
+                <button id="help-btn" class="control-btn" aria-label="단축키 도움말" onclick="openHelpModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- SVG 오버레이 -->
+        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
+            <!-- 각도기 그룹 (하단 중앙) -->
+            <g id="protractor-group" transform="translate(50, 95)">
+                <!-- 각도기 배경 (투명하게, 축소) -->
+                <path id="protractor-bg" d="M -20 0 A 20 20 0 0 1 20 0 L 17.5 0 A 17.5 17.5 0 0 0 -17.5 0 Z"
+                    fill="rgba(0, 0, 0, 0.3)" stroke="rgba(255, 255, 255, 0.5)" stroke-width="0.2" />
+
+                <!-- 눈금 -->
+                <g id="tick-marks"></g>
+
+                <!-- 중앙점 -->
+                <circle cx="0" cy="0" r="0.75" fill="rgba(255, 255, 255, 0.8)" />
+            </g>
+
+            <!-- 기준선 1 (수직) -->
+            <g id="line1-group" class="line-group">
+                <line id="line1" x1="50" y1="85" x2="50" y2="25" stroke="#007AFF" stroke-width="0.3"
+                    stroke-linecap="round" />
+                <line id="line1-ext" x1="50" y1="25" x2="50" y2="0" stroke="#007AFF" stroke-width="0.3"
+                    stroke-linecap="round" />
+                <circle id="handle1" cx="50" cy="25" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+            </g>
+
+            <!-- 기준선 2 (기울어진) -->
+            <g id="line2-group" class="line-group">
+                <line id="line2" x1="50" y1="85" x2="75" y2="35" stroke="#007AFF" stroke-width="0.4"
+                    stroke-linecap="round" />
+                <line id="line2-ext" x1="75" y1="35" x2="90" y2="5" stroke="#007AFF" stroke-width="0.4"
+                    stroke-linecap="round" />
+                <circle id="handle2" cx="75" cy="35" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+            </g>
+
+            <!-- 수평 기준선 (좌우 기울기 - 녹색) -->
+            <g id="gravity-line-group">
+                <line id="gravity-line" x1="10" y1="95" x2="90" y2="95" stroke="#34C759" stroke-width="0.6"
+                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+                <circle id="gravity-indicator-left" cx="10" cy="95" r="1.5" fill="#34C759" />
+                <circle id="gravity-indicator-right" cx="90" cy="95" r="1.5" fill="#34C759" />
+            </g>
+
+            <!-- 수직 기준선 (앞뒤 기울기 - 주황색) -->
+            <g id="tilt-line-group">
+                <line id="tilt-line" x1="50" y1="30" x2="50" y2="70" stroke="#FF9500" stroke-width="0.6"
+                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+                <circle id="tilt-indicator-top" cx="50" cy="30" r="1.5" fill="#FF9500" />
+                <circle id="tilt-indicator-bottom" cx="50" cy="70" r="1.5" fill="#FF9500" />
+            </g>
+        </svg>
+
+        <!-- 단축키 도움말 모달 -->
+        <div id="help-modal" class="modal hidden" onclick="if(event.target === this) closeHelpModal()">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>단축키 안내</h2>
+                    <button id="close-help" class="close-btn" onclick="closeHelpModal()">&times;</button>
+                </div>
+                <div class="shortcut-list">
+                    <div class="shortcut-item">
+                        <span class="key">M</span>
+                        <span class="desc">일반 / 각도설정 모드 전환</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">R</span>
+                        <span class="desc">중심점 리셋</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">F</span>
+                        <span class="desc">각도기 눈금 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">;</span>
+                        <span class="desc">기울기 지시선 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">V</span>
+                        <span class="desc">수직선 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">/</span>
+                        <span class="desc">전후면 카메라 전환</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">[ ]</span>
+                        <span class="desc">카메라 축소 / 확대</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">W, A, S, D</span>
+                        <span class="desc">중심점 이동 (Shift: 빠르게)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">. ,</span>
+                        <span class="desc">각도 조절 (+1, -1)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">&gt; &lt;</span>
+                        <span class="desc">각도 조절 (+10, -10)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">0-9</span>
+                        <span class="desc">각도 즉시 설정 (10~50, -10~-50)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">E</span>
+                        <span class="desc">ESP32 서보 연결 설정</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESP32 설정 모달 -->
+        <div id="esp32-modal" class="modal hidden" onclick="if(event.target === this) closeESP32Modal()">
+            <div class="modal-content esp32-modal-content">
+                <div class="modal-header">
+                    <h2>📡 ESP32 서보 연결</h2>
+                    <button class="close-btn" onclick="closeESP32Modal()">&times;</button>
+                </div>
+                <div class="esp32-info">
+                    <div class="esp32-status-card" id="esp32-connection-status">
+                        <div class="status-icon disconnected">●</div>
+                        <span>연결 안됨</span>
+                    </div>
+
+                    <div class="esp32-instructions">
+                        <h3>연결 방법</h3>
+                        <ol>
+                            <li>ESP32에 아두이노 코드 업로드</li>
+                            <li>기기 WiFi 설정에서 연결:
+                                <div class="wifi-info">
+                                    <strong>SSID:</strong> Protractor-Servo<br>
+                                    <strong>비밀번호:</strong> 12345678
+                                </div>
+                            </li>
+                            <li>아래 연결 버튼 클릭</li>
+                        </ol>
+                    </div>
+
+                    <!-- HTTPS 제한 안내 및 블루투스 옵션 -->
+                    <div class="esp32-connection-options">
+                        <!-- 블루투스 연결 (HTTPS에서도 작동) -->
+                        <div class="esp32-ble-section">
+                            <p>🔵 <strong>블루투스 연결</strong> (권장)</p>
+                            <p class="ble-desc">HTTPS에서도 작동합니다. Chrome/Edge 필요.</p>
+                            <button class="esp32-action-btn ble-btn" onclick="connectBLE()">
+                                🔵 블루투스 연결
+                            </button>
+                        </div>
+
+                        <div class="esp32-divider">
+                            <span>또는</span>
+                        </div>
+
+                        <!-- WiFi 연결 -->
+                        <div class="esp32-wifi-section">
+                            <p>📡 <strong>WiFi 연결</strong></p>
+                            <p class="wifi-desc">HTTP 환경에서만 작동합니다.</p>
+                            <div class="esp32-actions">
+                                <button id="esp32-test-btn" class="esp32-action-btn wifi-btn"
+                                    onclick="testESP32Connection()">
+                                    📡 WiFi 연결 테스트
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 연결 해제 버튼 -->
+                    <div class="esp32-actions disconnect-section">
+                        <button id="esp32-disconnect-btn" class="esp32-action-btn secondary hidden"
+                            onclick="disconnectESP32(); disconnectBLE();">
+                            연결 해제
+                        </button>
+                    </div>
+
+                    <!-- 디버그 콘솔 -->
+                    <div id="debug-console" class="debug-console" style="display: none;">
+                        <div class="debug-header">
+                            <span>디버그 로그 (v1.1)</span>
+                            <button onclick="clearDebugLog()">지우기</button>
+                        </div>
+                        <div id="debug-log" class="debug-log"></div>
+                    </div>
+
+                    <div id="esp32-message" class="esp32-message hidden"></div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- app-wrapper 끝 -->
+
+    <script>
 // AR 각도기 앱
 (function () {
     // 전역 에러 핸들러 (디버그용)
@@ -3256,6 +3151,122 @@ const char* app_js = R"rawliteral(
     }
 })();
 
+</script>
+
+    <!-- Service Worker 등록 및 PWA 설치 안내 -->
+    <script>
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker 등록 성공:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 등록 실패:', error);
+                    });
+            });
+        }
+
+        // iOS Safari 설치 안내
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
+        function isInStandaloneMode() {
+            return window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+        }
+
+        // iOS에서 Safari로 접속했고, 아직 설치되지 않은 경우 안내 표시
+        if (isIOS() && !isInStandaloneMode()) {
+            const lastPrompt = localStorage.getItem('iosInstallPromptDismissed');
+            const now = Date.now();
+
+            // 24시간 내에 닫았으면 다시 표시 안 함
+            if (!lastPrompt || (now - parseInt(lastPrompt)) > 24 * 60 * 60 * 1000) {
+                setTimeout(() => {
+                    const banner = document.getElementById('ios-install-banner');
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                    }
+                }, 2000);
+            }
+        }
+
+        function dismissIOSBanner() {
+            const banner = document.getElementById('ios-install-banner');
+            if (banner) {
+                banner.classList.add('hidden');
+                localStorage.setItem('iosInstallPromptDismissed', Date.now().toString());
+            }
+        }
+
+        // Android/Desktop PWA 설치 프롬프트
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // 설치 버튼 표시 (Android/Desktop)
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('PWA 설치됨');
+                    }
+                    deferredPrompt = null;
+                    const installBtn = document.getElementById('pwa-install-btn');
+                    if (installBtn) {
+                        installBtn.classList.add('hidden');
+                    }
+                });
+            }
+        }
+    </script>
+
+    <!-- iOS 설치 안내 배너 -->
+    <div id="ios-install-banner" class="hidden">
+        <div class="ios-install-content">
+            <div class="ios-install-icon">
+                <img src="icon-180.png" alt="앱 아이콘" width="48" height="48">
+            </div>
+            <div class="ios-install-text">
+                <strong>홈 화면에 추가하기</strong>
+                <p>
+                    <span class="share-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                    </span>
+                    공유 버튼 → "홈 화면에 추가" 선택
+                </p>
+            </div>
+            <button class="ios-install-close" onclick="dismissIOSBanner()">×</button>
+        </div>
+    </div>
+
+    <!-- Android/Desktop 설치 버튼 -->
+    <button id="pwa-install-btn" class="hidden" onclick="installPWA()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        앱 설치
+    </button>
+</body>
+
+</html>
 )rawliteral";
 
 #endif
