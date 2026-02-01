@@ -1,5 +1,29 @@
 // AR 각도기 앱
 (function () {
+    // 전역 에러 핸들러 (디버그용)
+    window.onerror = function (msg, url, line, col, error) {
+        // writeToDebugLog 함수가 정의되기 전일 수 있으므로 안전하게 처리
+        const message = `Error: ${msg}\nLine: ${line}:${col}`;
+        console.error(message);
+
+        // DOM이 로드된 후 로그창이 있으면 출력
+        setTimeout(() => {
+            if (window.writeToDebugLog) {
+                window.writeToDebugLog(message, 'error');
+            } else {
+                // writeToDebugLog가 없으면 ESP32 모달 열어서 보여주도록 시도
+                if (window.openESP32Modal) window.openESP32Modal();
+                const debugLog = document.getElementById('debug-log');
+                if (debugLog) {
+                    debugLog.innerHTML += `<div class="log-entry log-error">${message}</div>`;
+                    const consoleDiv = document.getElementById('debug-console');
+                    if (consoleDiv) consoleDiv.style.display = 'block';
+                }
+            }
+        }, 1000);
+        return false;
+    };
+
     'use strict';
 
     // DOM 요소
@@ -1115,6 +1139,21 @@
 
     // 카메라 접근
     async function requestCameraAccess() {
+        // HTTP 환경 (WiFi 모드)에서는 카메라 지원 안함 (보안 정책)
+        if (location.protocol === 'http:') {
+            console.warn('HTTP 환경 감지: 카메라 없이 시작');
+            writeToDebugLog('HTTP 모드: 카메라 미사용 (보안 정책)', 'warn');
+
+            // 비디오 숨기고 흰색 배경
+            if (video) video.style.display = 'none';
+            document.body.style.backgroundColor = '#f0f0f0';
+
+            // 키보드 포커스 설정
+            document.body.setAttribute('tabindex', '-1');
+            document.body.focus();
+            return;
+        }
+
         // 권한 요청 오버레이 표시
         showPermissionOverlay();
     }
