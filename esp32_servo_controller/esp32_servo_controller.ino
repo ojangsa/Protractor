@@ -59,6 +59,9 @@ bool oldDeviceConnected = false;
 // 현재 각도
 int currentAngle = 0;
 
+// 함수 프로토타입 선언
+void setServoAngle(int angle);
+
 // BLE 서버 콜백
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *pServer) {
