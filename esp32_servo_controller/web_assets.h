@@ -1,0 +1,3205 @@
+#ifndef WEB_ASSETS_H
+#define WEB_ASSETS_H
+
+const char* index_html = R"rawliteral(
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AR 각도기">
+    <title>PTNB 각도기</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- 앱 전체 래퍼 (화면 회전 보정용) -->
+    <div id="app-wrapper">
+        <!-- 카메라 비디오 피드 -->
+        <video id="camera" autoplay playsinline></video>
+
+        <!-- 각도 표시 배지 -->
+        <div id="angle-badge">
+            <span id="angle-value">0</span>°
+            <span id="level-ok" class="hidden">✓</span>
+            <span id="tilt-ok" class="hidden">✓</span>
+        </div>
+
+        <!-- 각도 입력 패널 -->
+        <div id="angle-input-panel" class="hidden">
+            <label for="angle-input">각도:</label>
+            <input type="number" id="angle-input" min="-180" max="180" value="45" step="1" />
+            <span>°</span>
+        </div>
+
+        <!-- 컨트롤 버튼 컨테이너 -->
+        <div class="controls-container">
+            <!-- 상단 우측 가로 배열 그룹 -->
+            <div class="controls-top-right">
+                <!-- ESP32 연결 버튼 -->
+                <button id="esp32-connect" class="esp32-btn" aria-label="ESP32 서보 연결">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="currentColor" />
+                    </svg>
+                    <span id="esp32-status-dot" class="status-dot disconnected"></span>
+                </button>
+
+                <!-- 각도기 눈금 토글 버튼 -->
+                <button id="toggle-protractor" aria-label="각도기 눈금 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22c5.5 0 10-4.5 10-10S17.5 2 12 2 2 6.5 2 12" />
+                        <path d="M2 12h10" />
+                        <path d="M12 12V2" />
+                    </svg>
+                </button>
+
+                <!-- 수직선 토글 버튼 -->
+                <button id="toggle-vertical-line" aria-label="수직선 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="2" x2="12" y2="22" />
+                    </svg>
+                </button>
+
+                <!-- 기울기선 토글 버튼 -->
+                <button id="toggle-tilt-line" aria-label="기울기선 표시 토글">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="2" x2="12" y2="22" />
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 전환 버튼 -->
+                <button id="switch-camera" aria-label="카메라 전환">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                        <path d="M17 8l2-2M17 6l2 2" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 우측 세로 배열 그룹 -->
+            <div class="controls-right-column">
+                <!-- 측정 모드 전환 버튼 -->
+                <button id="switch-mode" aria-label="측정 모드 전환">
+                    <svg id="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M2 12h20" />
+                    </svg>
+                    <span id="mode-label">일반</span>
+                </button>
+
+                <!-- 중심점 리셋 버튼 -->
+                <button id="reset-center" aria-label="중심점 리셋">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                        <circle cx="12" cy="12" r="2" fill="currentColor" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 확대 버튼 -->
+                <button id="zoom-in-btn" aria-label="카메라 확대">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                        <line x1="11" y1="8" x2="11" y2="14" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                </button>
+
+                <!-- 카메라 축소 버튼 -->
+                <button id="zoom-out-btn" aria-label="카메라 축소">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                        <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                </button>
+
+                <!-- 단축키 도움말 버튼 -->
+                <button id="help-btn" class="control-btn" aria-label="단축키 도움말" onclick="openHelpModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- SVG 오버레이 -->
+        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
+            <!-- 각도기 그룹 (하단 중앙) -->
+            <g id="protractor-group" transform="translate(50, 95)">
+                <!-- 각도기 배경 (투명하게, 축소) -->
+                <path id="protractor-bg" d="M -20 0 A 20 20 0 0 1 20 0 L 17.5 0 A 17.5 17.5 0 0 0 -17.5 0 Z"
+                    fill="rgba(0, 0, 0, 0.3)" stroke="rgba(255, 255, 255, 0.5)" stroke-width="0.2" />
+
+                <!-- 눈금 -->
+                <g id="tick-marks"></g>
+
+                <!-- 중앙점 -->
+                <circle cx="0" cy="0" r="0.75" fill="rgba(255, 255, 255, 0.8)" />
+            </g>
+
+            <!-- 기준선 1 (수직) -->
+            <g id="line1-group" class="line-group">
+                <line id="line1" x1="50" y1="85" x2="50" y2="25" stroke="#007AFF" stroke-width="0.3"
+                    stroke-linecap="round" />
+                <line id="line1-ext" x1="50" y1="25" x2="50" y2="0" stroke="#007AFF" stroke-width="0.3"
+                    stroke-linecap="round" />
+                <circle id="handle1" cx="50" cy="25" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+            </g>
+
+            <!-- 기준선 2 (기울어진) -->
+            <g id="line2-group" class="line-group">
+                <line id="line2" x1="50" y1="85" x2="75" y2="35" stroke="#007AFF" stroke-width="0.4"
+                    stroke-linecap="round" />
+                <line id="line2-ext" x1="75" y1="35" x2="90" y2="5" stroke="#007AFF" stroke-width="0.4"
+                    stroke-linecap="round" />
+                <circle id="handle2" cx="75" cy="35" r="2.5" fill="white" stroke="#007AFF" stroke-width="0.4" />
+            </g>
+
+            <!-- 수평 기준선 (좌우 기울기 - 녹색) -->
+            <g id="gravity-line-group">
+                <line id="gravity-line" x1="10" y1="95" x2="90" y2="95" stroke="#34C759" stroke-width="0.6"
+                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+                <circle id="gravity-indicator-left" cx="10" cy="95" r="1.5" fill="#34C759" />
+                <circle id="gravity-indicator-right" cx="90" cy="95" r="1.5" fill="#34C759" />
+            </g>
+
+            <!-- 수직 기준선 (앞뒤 기울기 - 주황색) -->
+            <g id="tilt-line-group">
+                <line id="tilt-line" x1="50" y1="30" x2="50" y2="70" stroke="#FF9500" stroke-width="0.6"
+                    stroke-linecap="round" stroke-dasharray="1.5,0.8" />
+                <circle id="tilt-indicator-top" cx="50" cy="30" r="1.5" fill="#FF9500" />
+                <circle id="tilt-indicator-bottom" cx="50" cy="70" r="1.5" fill="#FF9500" />
+            </g>
+        </svg>
+
+        <!-- 단축키 도움말 모달 -->
+        <div id="help-modal" class="modal hidden" onclick="if(event.target === this) closeHelpModal()">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>단축키 안내</h2>
+                    <button id="close-help" class="close-btn" onclick="closeHelpModal()">&times;</button>
+                </div>
+                <div class="shortcut-list">
+                    <div class="shortcut-item">
+                        <span class="key">M</span>
+                        <span class="desc">일반 / 각도설정 모드 전환</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">R</span>
+                        <span class="desc">중심점 리셋</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">F</span>
+                        <span class="desc">각도기 눈금 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">;</span>
+                        <span class="desc">기울기 지시선 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">V</span>
+                        <span class="desc">수직선 켜기/끄기</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">/</span>
+                        <span class="desc">전후면 카메라 전환</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">[ ]</span>
+                        <span class="desc">카메라 축소 / 확대</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">W, A, S, D</span>
+                        <span class="desc">중심점 이동 (Shift: 빠르게)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">. ,</span>
+                        <span class="desc">각도 조절 (+1, -1)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">&gt; &lt;</span>
+                        <span class="desc">각도 조절 (+10, -10)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">0-9</span>
+                        <span class="desc">각도 즉시 설정 (10~50, -10~-50)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">E</span>
+                        <span class="desc">ESP32 서보 연결 설정</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESP32 설정 모달 -->
+        <div id="esp32-modal" class="modal hidden" onclick="if(event.target === this) closeESP32Modal()">
+            <div class="modal-content esp32-modal-content">
+                <div class="modal-header">
+                    <h2>📡 ESP32 서보 연결</h2>
+                    <button class="close-btn" onclick="closeESP32Modal()">&times;</button>
+                </div>
+                <div class="esp32-info">
+                    <div class="esp32-status-card" id="esp32-connection-status">
+                        <div class="status-icon disconnected">●</div>
+                        <span>연결 안됨</span>
+                    </div>
+
+                    <div class="esp32-instructions">
+                        <h3>연결 방법</h3>
+                        <ol>
+                            <li>ESP32에 아두이노 코드 업로드</li>
+                            <li>기기 WiFi 설정에서 연결:
+                                <div class="wifi-info">
+                                    <strong>SSID:</strong> Protractor-Servo<br>
+                                    <strong>비밀번호:</strong> 12345678
+                                </div>
+                            </li>
+                            <li>아래 연결 버튼 클릭</li>
+                        </ol>
+                    </div>
+
+                    <!-- HTTPS 제한 안내 및 블루투스 옵션 -->
+                    <div class="esp32-connection-options">
+                        <!-- 블루투스 연결 (HTTPS에서도 작동) -->
+                        <div class="esp32-ble-section">
+                            <p>🔵 <strong>블루투스 연결</strong> (권장)</p>
+                            <p class="ble-desc">HTTPS에서도 작동합니다. Chrome/Edge 필요.</p>
+                            <button class="esp32-action-btn ble-btn" onclick="connectBLE()">
+                                🔵 블루투스 연결
+                            </button>
+                        </div>
+
+                        <div class="esp32-divider">
+                            <span>또는</span>
+                        </div>
+
+                        <!-- WiFi 연결 -->
+                        <div class="esp32-wifi-section">
+                            <p>📡 <strong>WiFi 연결</strong></p>
+                            <p class="wifi-desc">HTTP 환경에서만 작동합니다.</p>
+                            <div class="esp32-actions">
+                                <button id="esp32-test-btn" class="esp32-action-btn wifi-btn"
+                                    onclick="testESP32Connection()">
+                                    📡 WiFi 연결 테스트
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 연결 해제 버튼 -->
+                    <div class="esp32-actions disconnect-section">
+                        <button id="esp32-disconnect-btn" class="esp32-action-btn secondary hidden"
+                            onclick="disconnectESP32(); disconnectBLE();">
+                            연결 해제
+                        </button>
+                    </div>
+
+                    <!-- 디버그 콘솔 -->
+                    <div id="debug-console" class="debug-console" style="display: none;">
+                        <div class="debug-header">
+                            <span>디버그 로그 (v1.1)</span>
+                            <button onclick="clearDebugLog()">지우기</button>
+                        </div>
+                        <div id="debug-log" class="debug-log"></div>
+                    </div>
+
+                    <div id="esp32-message" class="esp32-message hidden"></div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- app-wrapper 끝 -->
+
+    <script src="app.js"></script>
+
+    <!-- Service Worker 등록 및 PWA 설치 안내 -->
+    <script>
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker 등록 성공:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 등록 실패:', error);
+                    });
+            });
+        }
+
+        // iOS Safari 설치 안내
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
+        function isInStandaloneMode() {
+            return window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+        }
+
+        // iOS에서 Safari로 접속했고, 아직 설치되지 않은 경우 안내 표시
+        if (isIOS() && !isInStandaloneMode()) {
+            const lastPrompt = localStorage.getItem('iosInstallPromptDismissed');
+            const now = Date.now();
+
+            // 24시간 내에 닫았으면 다시 표시 안 함
+            if (!lastPrompt || (now - parseInt(lastPrompt)) > 24 * 60 * 60 * 1000) {
+                setTimeout(() => {
+                    const banner = document.getElementById('ios-install-banner');
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                    }
+                }, 2000);
+            }
+        }
+
+        function dismissIOSBanner() {
+            const banner = document.getElementById('ios-install-banner');
+            if (banner) {
+                banner.classList.add('hidden');
+                localStorage.setItem('iosInstallPromptDismissed', Date.now().toString());
+            }
+        }
+
+        // Android/Desktop PWA 설치 프롬프트
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // 설치 버튼 표시 (Android/Desktop)
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('PWA 설치됨');
+                    }
+                    deferredPrompt = null;
+                    const installBtn = document.getElementById('pwa-install-btn');
+                    if (installBtn) {
+                        installBtn.classList.add('hidden');
+                    }
+                });
+            }
+        }
+    </script>
+
+    <!-- iOS 설치 안내 배너 -->
+    <div id="ios-install-banner" class="hidden">
+        <div class="ios-install-content">
+            <div class="ios-install-icon">
+                <img src="icon-180.png" alt="앱 아이콘" width="48" height="48">
+            </div>
+            <div class="ios-install-text">
+                <strong>홈 화면에 추가하기</strong>
+                <p>
+                    <span class="share-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                    </span>
+                    공유 버튼 → "홈 화면에 추가" 선택
+                </p>
+            </div>
+            <button class="ios-install-close" onclick="dismissIOSBanner()">×</button>
+        </div>
+    </div>
+
+    <!-- Android/Desktop 설치 버튼 -->
+    <button id="pwa-install-btn" class="hidden" onclick="installPWA()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        앱 설치
+    </button>
+</body>
+
+</html>
+)rawliteral";
+
+const char* styles_css = R"rawliteral(
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+
+/* 앱 래퍼 - 화면 회전 보정 */
+#app-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 세로 모드에서 앱을 90도 회전하여 가로처럼 보이게 함 */
+@media (orientation: portrait) {
+    #app-wrapper {
+        transform-origin: top left;
+        transform: rotate(90deg) translateY(-100%);
+        width: 100vh;
+        height: 100vw;
+    }
+}
+
+/* 카메라 비디오 */
+#camera {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+/* SVG 오버레이 */
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    touch-action: none;
+}
+
+/* 각도 표시 배지 */
+#angle-badge {
+    position: fixed;
+    top: env(safe-area-inset-top, 20px);
+    left: 20px;
+    padding: 12px 24px;
+    background: rgba(0, 122, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    color: white;
+    font-size: 32px;
+    font-weight: 600;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+#angle-value {
+    font-variant-numeric: tabular-nums;
+    min-width: 50px;
+    text-align: center;
+}
+
+#level-ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #34C759;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: bold;
+    margin-left: 8px;
+    animation: pulse 0.5s ease-out;
+}
+
+#tilt-ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #FF9500;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: bold;
+    margin-left: 4px;
+    animation: pulse 0.5s ease-out;
+}
+
+#level-ok.hidden,
+#tilt-ok.hidden {
+    display: none;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 컨트롤 버튼 컨테이너 */
+.controls-container {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 20px) + 6px);
+    right: max(env(safe-area-inset-right, 20px), 20px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    z-index: 100;
+}
+
+/* 상단 우측 그룹 (가로 배열) */
+.controls-top-right {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 8px;
+}
+
+/* 우측 세로 그룹 */
+.controls-right-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+/* 개별 버튼 공통 스타일 */
+.controls-container button {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.controls-container button:active {
+    transform: scale(0.92);
+    background: rgba(255, 255, 255, 1);
+}
+
+.controls-container button svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* 카메라 전환 버튼 */
+#switch-camera svg {
+    color: #333;
+}
+
+/* 기울기선 토글 버튼 */
+#toggle-tilt-line svg {
+    color: #FF9500;
+}
+
+#toggle-tilt-line.off svg {
+    color: #999;
+}
+
+/* 각도기 눈금 토글 버튼 */
+#toggle-protractor svg {
+    color: #007AFF;
+}
+
+#toggle-protractor.off svg {
+    color: #999;
+}
+
+/* 수직선 토글 버튼 */
+#toggle-vertical-line svg {
+    color: #007AFF;
+}
+
+#toggle-vertical-line.off svg {
+    color: #999;
+}
+
+/* 가로/세로 모드 전환 버튼 & 측정 모드 전환 버튼 (알약 모양) */
+#switch-orientation,
+#switch-mode {
+    width: auto;
+    padding: 0 14px;
+    border-radius: 22px;
+    gap: 6px;
+}
+
+#switch-orientation svg,
+#switch-mode svg {
+    width: 20px;
+    height: 20px;
+    color: #333;
+}
+
+#switch-orientation #orientation-label,
+#switch-mode #mode-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* 중심점 리셋 버튼 */
+#reset-center svg {
+    color: #333;
+}
+
+/* 각도 입력 패널 */
+#angle-input-panel {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 20px) + 65px);
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+#angle-input-panel.hidden {
+    display: none;
+}
+
+#angle-input-panel label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+#angle-input-panel input {
+    width: 60px;
+    padding: 6px 10px;
+    border: 2px solid #007AFF;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    background: white;
+}
+
+#angle-input-panel input:focus {
+    border-color: #0051d5;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+#angle-input-panel span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* 기준선 그룹 */
+.line-group {
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.line-group line {
+    transition: stroke-width 0.15s ease;
+    pointer-events: stroke;
+}
+
+.line-group circle {
+    transition: r 0.15s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    pointer-events: all;
+    cursor: grab;
+}
+
+.line-group.active line {
+    stroke-width: 0.8;
+}
+
+.line-group.active circle {
+    r: 3;
+    cursor: grabbing;
+}
+
+/* 각도기 스타일 */
+#protractor-bg {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
+}
+
+/* 수평 기준선 (중력) */
+#gravity-line-group {
+    transition: transform 0.05s linear;
+}
+
+#gravity-line {
+    filter: drop-shadow(0 1px 3px rgba(52, 199, 89, 0.5));
+}
+
+#gravity-indicator-left,
+#gravity-indicator-right {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* 수직 기준선 (기울기) */
+#tilt-line-group {
+    transition: transform 0.05s linear;
+}
+
+#tilt-line {
+    filter: drop-shadow(0 1px 3px rgba(255, 149, 0, 0.5));
+}
+
+#tilt-indicator-top,
+#tilt-indicator-bottom {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* 권한 요청 화면 */
+.permission-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    color: white;
+    text-align: center;
+    padding: 40px;
+}
+
+.permission-overlay h1 {
+    font-size: 28px;
+    margin-bottom: 16px;
+    font-weight: 700;
+}
+
+.permission-overlay p {
+    font-size: 16px;
+    opacity: 0.8;
+    margin-bottom: 32px;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+.permission-overlay button {
+    padding: 16px 48px;
+    font-size: 18px;
+    font-weight: 600;
+    background: #007AFF;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
+}
+
+.permission-overlay button:active {
+    transform: scale(0.96);
+}
+
+/* 가로/세로 모드 대응 */
+@media (orientation: landscape) {
+    #angle-badge {
+        top: 20px;
+        left: max(env(safe-area-inset-left, 20px), 20px);
+    }
+
+    #angle-input-panel {
+        top: 85px;
+        left: max(env(safe-area-inset-left, 20px), 20px);
+    }
+}
+
+/* 단축키 도움말 모달 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.modal.hidden {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-content {
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    color: white;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: white;
+}
+
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+}
+
+.shortcut-item .key {
+    background-color: rgba(255, 255, 255, 0.15);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #ffd700;
+    min-width: 24px;
+    text-align: center;
+}
+
+.shortcut-item .desc {
+    color: rgba(255, 255, 255, 0.8);
+    text-align: right;
+    flex: 1;
+    margin-left: 12px;
+}
+
+/* iOS 설치 안내 배너 */
+#ios-install-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(30, 30, 30, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 16px 20px;
+    z-index: 3000;
+    animation: slideUp 0.3s ease-out;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#ios-install-banner.hidden {
+    display: none;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.ios-install-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.ios-install-icon img {
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.ios-install-text {
+    flex: 1;
+    color: white;
+}
+
+.ios-install-text strong {
+    display: block;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.ios-install-text p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ios-install-text .share-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #007AFF;
+}
+
+.ios-install-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.ios-install-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Android/Desktop PWA 설치 버튼 */
+#pwa-install-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #007AFF 0%, #0051d5 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 122, 255, 0.4);
+    z-index: 3000;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: fadeIn 0.3s ease-out;
+}
+
+#pwa-install-btn.hidden {
+    display: none;
+}
+
+#pwa-install-btn:hover {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 6px 25px rgba(0, 122, 255, 0.5);
+}
+
+#pwa-install-btn:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
+#pwa-install-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* 일반 hidden 클래스 */
+.hidden {
+    display: none !important;
+}
+
+/* ===== ESP32 연결 버튼 스타일 ===== */
+.esp32-btn {
+    position: relative;
+}
+
+.esp32-btn svg {
+    color: #007AFF;
+}
+
+.esp32-btn.connected svg {
+    color: #34C759;
+}
+
+/* 연결 상태 도트 인디케이터 */
+.status-dot {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.status-dot.disconnected {
+    background: #FF3B30;
+}
+
+.status-dot.connected {
+    background: #34C759;
+    animation: pulse-green 2s infinite;
+}
+
+.status-dot.connecting {
+    background: #FF9500;
+    animation: pulse-orange 1s infinite;
+}
+
+@keyframes pulse-green {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(52, 199, 89, 0);
+    }
+}
+
+@keyframes pulse-orange {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ===== ESP32 설정 모달 ===== */
+.esp32-modal-content {
+    max-width: 360px;
+}
+
+.esp32-info {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.esp32-status-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.esp32-status-card .status-icon {
+    font-size: 24px;
+}
+
+.esp32-status-card .status-icon.disconnected {
+    color: #FF3B30;
+}
+
+.esp32-status-card .status-icon.connected {
+    color: #34C759;
+}
+
+.esp32-status-card .status-icon.connecting {
+    color: #FF9500;
+    animation: pulse-orange 1s infinite;
+}
+
+.esp32-instructions {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.esp32-instructions h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.esp32-instructions ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.wifi-info {
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(0, 122, 255, 0.2);
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.wifi-info strong {
+    color: #FFD700;
+}
+
+.esp32-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.esp32-action-btn {
+    flex: 1;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.esp32-action-btn:not(.secondary) {
+    background: linear-gradient(135deg, #007AFF 0%, #0051d5 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+}
+
+.esp32-action-btn:not(.secondary):hover {
+    background: linear-gradient(135deg, #0066CC 0%, #0040a8 100%);
+}
+
+.esp32-action-btn.secondary {
+    background: rgba(255, 59, 48, 0.2);
+    color: #FF3B30;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.esp32-action-btn.secondary:hover {
+    background: rgba(255, 59, 48, 0.3);
+}
+
+.esp32-action-btn:active {
+    transform: scale(0.96);
+}
+
+.esp32-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.esp32-message.success {
+    background: rgba(52, 199, 89, 0.2);
+    color: #34C759;
+    border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.esp32-message.error {
+    background: rgba(255, 59, 48, 0.2);
+    color: #FF3B30;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.esp32-message.info {
+    background: rgba(0, 122, 255, 0.2);
+    color: #007AFF;
+    border: 1px solid rgba(0, 122, 255, 0.3);
+}
+
+/* ESP32 HTTPS 제한 안내 */
+.esp32-https-notice {
+    background: rgba(255, 149, 0, 0.15);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-https-notice p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-https-notice p:first-child {
+    color: #FF9500;
+    font-size: 14px;
+}
+
+.esp32-direct-link {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.esp32-direct-link:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
+}
+
+/* 연결 옵션 컨테이너 */
+.esp32-connection-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 블루투스 섹션 */
+.esp32-ble-section {
+    background: rgba(0, 122, 255, 0.1);
+    border: 1px solid rgba(0, 122, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-ble-section p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-ble-section p:first-child {
+    color: #007AFF;
+    font-size: 15px;
+}
+
+.ble-desc,
+.wifi-desc {
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.ble-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%) !important;
+    margin-top: 8px;
+}
+
+.ble-btn:hover {
+    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
+}
+
+/* WiFi 섹션 */
+.esp32-wifi-section {
+    background: rgba(255, 149, 0, 0.1);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-wifi-section p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-wifi-section p:first-child {
+    color: #FF9500;
+    font-size: 15px;
+}
+
+.wifi-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%) !important;
+    margin-top: 8px;
+}
+
+.wifi-btn:hover {
+    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
+}
+
+/* 구분선 */
+.esp32-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+}
+
+.esp32-divider::before,
+.esp32-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.esp32-divider span {
+    padding: 0 12px;
+}
+
+/* 연결 해제 섹션 */
+.disconnect-section {
+    margin-top: 12px;
+}
+
+/* 디버그 콘솔 스타일 */
+.debug-console {
+    margin-top: 20px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background-color: #1e1e1e;
+    padding: 10px;
+    font-size: 12px;
+}
+
+.debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #eee;
+}
+
+.debug-header button {
+    background: #444;
+    color: white;
+    border: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.debug-log {
+    height: 150px;
+    overflow-y: auto;
+    background-color: #111;
+    border: 1px solid #333;
+    padding: 8px;
+    font-family: 'Menlo', 'Monaco', monospace;
+    white-space: pre-wrap;
+    color: #ccc;
+    font-size: 11px;
+}
+
+.log-entry {
+    margin-bottom: 4px;
+    border-bottom: 1px solid #222;
+    padding-bottom: 2px;
+}
+
+.log-error {
+    color: #ff6b6b;
+}
+
+.log-warn {
+    color: #feca57;
+}
+
+.log-success {
+    color: #1dd1a1;
+}
+
+.log-info {
+    color: #54a0ff;
+}
+)rawliteral";
+
+const char* app_js = R"rawliteral(
+// AR 각도기 앱
+(function () {
+    'use strict';
+
+    // DOM 요소
+    const video = document.getElementById('camera');
+    const overlay = document.getElementById('overlay');
+    const angleValue = document.getElementById('angle-value');
+    const switchCameraBtn = document.getElementById('switch-camera');
+    const tickMarks = document.getElementById('tick-marks');
+
+    const line1 = document.getElementById('line1');
+    const handle1 = document.getElementById('handle1');
+    const line1Group = document.getElementById('line1-group');
+
+    const line2 = document.getElementById('line2');
+    const handle2 = document.getElementById('handle2');
+    const line2Group = document.getElementById('line2-group');
+
+    // 연장선 요소
+    const line1Ext = document.getElementById('line1-ext');
+    const line2Ext = document.getElementById('line2-ext');
+    const EXTENSION_LENGTH = 100; // 연장선 길이
+
+    // 측정 모드 관련 요소
+    const switchModeBtn = document.getElementById('switch-mode');
+    const modeLabel = document.getElementById('mode-label');
+    const angleInputPanel = document.getElementById('angle-input-panel');
+    const angleInput = document.getElementById('angle-input');
+    const resetCenterBtn = document.getElementById('reset-center');
+
+    // 도움말 모달 관련
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help');
+
+    // 수평 기준선 요소 (좌우 기울기)
+    const gravityLineGroup = document.getElementById('gravity-line-group');
+    const gravityLine = document.getElementById('gravity-line');
+    const gravityIndicatorLeft = document.getElementById('gravity-indicator-left');
+    const gravityIndicatorRight = document.getElementById('gravity-indicator-right');
+
+    // 수직 기준선 요소 (앞뒤 기울기)
+    const tiltLineGroup = document.getElementById('tilt-line-group');
+    const tiltLine = document.getElementById('tilt-line');
+    const tiltIndicatorTop = document.getElementById('tilt-indicator-top');
+    const tiltIndicatorBottom = document.getElementById('tilt-indicator-bottom');
+    const toggleTiltLineBtn = document.getElementById('toggle-tilt-line');
+
+    let tiltLineVisible = true;  // 기울기선 표시 상태
+
+    // 각도기 눈금 요소
+    const protractorGroup = document.getElementById('protractor-group');
+    const toggleProtractorBtn = document.getElementById('toggle-protractor');
+    let protractorVisible = true; // 각도기 눈금 표시 상태
+
+    // 수직선 토글 버튼
+    const toggleVerticalLineBtn = document.getElementById('toggle-vertical-line');
+    let verticalLineVisible = false; // 수직선 표시 상태 (초기값: 꿄)
+
+    // 카메라 줌 버튼
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const ZOOM_STEP = 0.5; // 버튼 클릭당 줌 변화량
+
+    // 상태
+    let facingMode = 'environment'; // 후면 카메라 기본
+    let currentStream = null;
+    let isDragging = false;
+    let activeHandle = null;
+
+    // 중심점 (각도기 중심)
+    // 중심점 (각도기 중심) - 이동 가능하도록 변수로 변경
+    let currentCenter = { x: 50, y: 95 };
+    const LINE_LENGTH = 30; // 기준선 기본 길이 (축소)
+    const MIN_HANDLE_DISTANCE = 15; // 핸들 최소 거리
+    const MAX_HANDLE_DISTANCE = 80; // 핸들 최대 거리
+
+    // 현재 각도 (degree)
+    let angle1 = 90;  // 수직선 (위쪽)
+    let angle2 = 70;  // 오른쪽 위 (차이 20도)
+
+    // 핸들 거리 (중심점으로부터의 거리)
+    let handleDistance1 = LINE_LENGTH;
+    let handleDistance2 = LINE_LENGTH;
+
+    // 수평 기준선 각도 (좌우 기울기)
+    let gravityAngle = 0;
+
+    // 수직 기준선 각도 (앞뒤 기울기)
+    let tiltAngle = 0;
+
+    // 화면 방향 모드 ('landscape' = 가로, 'portrait' = 세로)
+    let orientationMode = 'portrait'; // 초기값을 세로로 설정하여 init에서 가로로 전환되게 함
+    const switchOrientationBtn = document.getElementById('switch-orientation');
+    const orientationIcon = document.getElementById('orientation-icon');
+    const orientationLabel = document.getElementById('orientation-label');
+
+    // 수평 OK 표시
+    const levelOk = document.getElementById('level-ok');
+    const tiltOk = document.getElementById('tilt-ok');
+    const LEVEL_THRESHOLD = 1.0; // 수평 판정 임계값 (±1.0도)
+
+    // 측정 모드 ('normal' = 일반 모드, 'angle-lock' = 각도 설정 모드)
+    let measurementMode = 'normal';
+    let lockedAngle = 20; // 각도 설정 모드에서 두 선 사이의 각도
+
+    // 카메라 줌 관련 상태
+    let currentZoom = 1;
+    let minZoom = 1;
+    let maxZoom = 1;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
+    let isApplyingZoom = false; // 줌 적용 중 플래그 (스로틀링용)
+
+    // ESP32 서보 모터 제어 관련
+    const ESP32_IP = '192.168.4.1'; // ESP32 AP 모드 기본 IP
+    const ESP32_PORT = 80;
+    let esp32Connected = false;
+    let esp32SendTimeout = null;
+    const ESP32_SEND_DEBOUNCE = 50; // 각도 전송 디바운스 시간 (ms)
+
+    // BLE (블루투스) 관련
+    const BLE_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+    const BLE_ANGLE_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef1';
+    const BLE_STATUS_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef2';
+    let bleDevice = null;
+    let bleServer = null;
+    let bleAngleCharacteristic = null;
+    let bleConnected = false;
+    let connectionMode = 'none'; // 'none', 'wifi', 'ble'
+
+    // ESP32 DOM 요소
+    const esp32ConnectBtn = document.getElementById('esp32-connect');
+    const esp32StatusDot = document.getElementById('esp32-status-dot');
+    const esp32Modal = document.getElementById('esp32-modal');
+    const esp32ConnectionStatus = document.getElementById('esp32-connection-status');
+    const esp32TestBtn = document.getElementById('esp32-test-btn');
+    const esp32DisconnectBtn = document.getElementById('esp32-disconnect-btn');
+    const esp32Message = document.getElementById('esp32-message');
+
+    // 초기화
+    init();
+
+    function init() {
+        createTickMarks();
+        updateLines();
+        updateGravityLine();
+        updateTiltLine();
+        setupEventListeners();
+        setupDeviceOrientation();
+        requestCameraAccess();
+
+        // 가로 모드 전용 (세로 모드 비활성화)
+        orientationMode = 'landscape';
+        overlay.setAttribute('viewBox', '0 0 100 100');
+        currentCenter.x = 50;
+        currentCenter.y = 95;
+        const protractorGroup = document.getElementById('protractor-group');
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 화면 방향 가로로 잠금 (회전 방지)
+        lockScreenOrientation('landscape');
+        // 일반 모드로 시작 (핸들 드래그 가능, 단 핸들1은 고정)
+        handle1.style.display = 'none';
+
+        // 수직선 초기 상태: 꺼짐
+        line1Group.style.display = 'none';
+        if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
+
+        // HTTP 환경에서 ESP32 자동 연결 시도
+        if (window.location.protocol === 'http:') {
+            setTimeout(() => {
+                autoConnectESP32();
+            }, 2000); // 2초 후 자동 연결 시도
+        }
+
+        // 키보드 단축키가 바로 작동하도록 포커스 설정
+        document.body.focus();
+    }
+
+    // 눈금 생성
+    function createTickMarks() {
+        const radius = 18.75;  // 축소 (기존 37.5의 절반)
+        const innerRadius = 17.5;  // 축소 (기존 35의 절반)
+
+        // 통일된 색상 (흰색 반투명)
+        const tickColor = 'rgba(255, 255, 255, 0.8)';
+
+        for (let deg = 0; deg <= 180; deg += 10) {
+            const rad = (deg * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // 긴 눈금 (10도 단위)
+            const outerX = -cos * radius;
+            const outerY = -sin * radius;
+            const innerX = -cos * innerRadius;
+            const innerY = -sin * innerRadius;
+
+            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            tick.setAttribute('x1', outerX);
+            tick.setAttribute('y1', outerY);
+            tick.setAttribute('x2', innerX);
+            tick.setAttribute('y2', innerY);
+            tick.setAttribute('stroke', tickColor);
+            tick.setAttribute('stroke-width', '0.3');
+            tickMarks.appendChild(tick);
+
+            // 숫자 라벨 (90도가 0, 양쪽 끝이 90)
+            if (deg % 10 === 0) {
+                const labelRadius = 16.5;  // 축소 (기존 33의 절반)
+                const labelX = -cos * labelRadius;
+                const labelY = -sin * labelRadius;
+
+                // 표시 값 변환: 90도->0, 0도->90, 180도->90
+                const displayValue = Math.abs(90 - deg);
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', labelX);
+                text.setAttribute('y', labelY);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('font-size', '1.1');  // 축소
+                text.setAttribute('font-weight', '500');
+                text.setAttribute('fill', tickColor);
+                text.textContent = displayValue;
+                tickMarks.appendChild(text);
+            }
+
+            // 작은 눈금 (5도 단위)
+            if (deg < 180) {
+                const smallDeg = deg + 5;
+                const smallRad = (smallDeg * Math.PI) / 180;
+                const smallCos = Math.cos(smallRad);
+                const smallSin = Math.sin(smallRad);
+
+                const smallOuterX = -smallCos * radius;
+                const smallOuterY = -smallSin * radius;
+                const smallInnerX = -smallCos * (innerRadius + 1);
+                const smallInnerY = -smallSin * (innerRadius + 1);
+
+                const smallTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                smallTick.setAttribute('x1', smallOuterX);
+                smallTick.setAttribute('y1', smallOuterY);
+                smallTick.setAttribute('x2', smallInnerX);
+                smallTick.setAttribute('y2', smallInnerY);
+                smallTick.setAttribute('stroke', tickColor);
+                smallTick.setAttribute('stroke-width', '0.2');
+                tickMarks.appendChild(smallTick);
+            }
+        }
+    }
+
+    // 라인 업데이트
+    function updateLines() {
+        // 각도를 라디안으로 변환 (0도가 오른쪽, 반시계 방향)
+        const rad1 = (angle1 * Math.PI) / 180;
+        const rad2 = (angle2 * Math.PI) / 180;
+
+        // 끝점 좌표 계산 (핸들 위치 - 동적 거리 사용)
+        const end1X = currentCenter.x - Math.cos(rad1) * handleDistance1;
+        const end1Y = currentCenter.y - Math.sin(rad1) * handleDistance1;
+        const end2X = currentCenter.x - Math.cos(rad2) * handleDistance2;
+        const end2Y = currentCenter.y - Math.sin(rad2) * handleDistance2;
+
+        // 연장선 끝점 계산 (핸들 이후로 EXTENSION_LENGTH만큼 연장)
+        const ext1X = currentCenter.x - Math.cos(rad1) * (handleDistance1 + EXTENSION_LENGTH);
+        const ext1Y = currentCenter.y - Math.sin(rad1) * (handleDistance1 + EXTENSION_LENGTH);
+        const ext2X = currentCenter.x - Math.cos(rad2) * (handleDistance2 + EXTENSION_LENGTH);
+        const ext2Y = currentCenter.y - Math.sin(rad2) * (handleDistance2 + EXTENSION_LENGTH);
+
+        // 라인 업데이트
+        line1.setAttribute('x1', currentCenter.x);
+        line1.setAttribute('y1', currentCenter.y);
+        line1.setAttribute('x2', end1X);
+        line1.setAttribute('y2', end1Y);
+        handle1.setAttribute('cx', end1X);
+        handle1.setAttribute('cy', end1Y);
+
+        // 연장선 1 업데이트
+        line1Ext.setAttribute('x1', end1X);
+        line1Ext.setAttribute('y1', end1Y);
+        line1Ext.setAttribute('x2', ext1X);
+        line1Ext.setAttribute('y2', ext1Y);
+
+        line2.setAttribute('x1', currentCenter.x);
+        line2.setAttribute('y1', currentCenter.y);
+        line2.setAttribute('x2', end2X);
+        line2.setAttribute('y2', end2Y);
+        handle2.setAttribute('cx', end2X);
+        handle2.setAttribute('cy', end2Y);
+
+        // 연장선 2 업데이트
+        line2Ext.setAttribute('x1', end2X);
+        line2Ext.setAttribute('y1', end2Y);
+        line2Ext.setAttribute('x2', ext2X);
+        line2Ext.setAttribute('y2', ext2Y);
+
+        // 각도 차이 계산
+        let angleDiff = Math.abs(angle1 - angle2);
+        if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+        angleValue.textContent = Math.round(angleDiff);
+    }
+
+    // 이벤트 설정
+    function setupEventListeners() {
+        // 카메라 전환
+        switchCameraBtn.addEventListener('click', switchCamera);
+
+        // 기울기선 토글
+        toggleTiltLineBtn.addEventListener('click', toggleTiltLine);
+
+        // 각도기 눈금 토글
+        toggleProtractorBtn.addEventListener('click', toggleProtractor);
+
+        // 수직선 토글
+        if (toggleVerticalLineBtn) {
+            toggleVerticalLineBtn.addEventListener('click', toggleVerticalLine);
+        }
+
+        // 카메라 줌 버튼
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', zoomIn);
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', zoomOut);
+        }
+
+        // 가로/세로 모드 전환 버튼 제거됨 (가로 모드 전용)
+
+        // 측정 모드 전환
+        switchModeBtn.addEventListener('click', toggleMeasurementMode);
+
+        // 중심점 리셋
+        resetCenterBtn.addEventListener('click', () => {
+            resetCenter();
+        });
+
+        // 도움말 모달 이벤트: HTML 인라인 onclick 사용으로 변경 (아이패드 호환성)
+        // 기존 addEventListener 코드 제거됨
+
+        // 각도 입력 변경
+        angleInput.addEventListener('input', onAngleInputChange);
+        angleInput.addEventListener('keydown', onAngleInputKeyDown);
+
+        // 마우스 이벤트 (데스크탑)
+        overlay.addEventListener('mousedown', onPointerDown);
+        overlay.addEventListener('mousemove', onPointerMove);
+        overlay.addEventListener('mouseup', onPointerUp);
+        overlay.addEventListener('mouseleave', onPointerUp);
+
+        // 터치 이벤트 (모바일/태블릿)
+        overlay.addEventListener('touchstart', onTouchStart, { passive: false });
+        overlay.addEventListener('touchmove', onTouchMove, { passive: false });
+        overlay.addEventListener('touchend', onTouchEnd);
+        overlay.addEventListener('touchcancel', onTouchEnd);
+
+        // 핸들에 직접 터치 이벤트 바인딩 (iOS Safari 호환성)
+        [handle1, handle2].forEach((handle, idx) => {
+            handle.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startDrag(idx + 1);
+            }, { passive: false });
+        });
+
+        // document 레벨 터치 이벤트 (드래그 중 화면 밖으로 나가도 동작)
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd);
+        document.addEventListener('touchcancel', onTouchEnd);
+
+        // 키보드 이벤트
+        document.addEventListener('keydown', onKeyDown);
+    }
+
+    // 키보드 이벤트 핸들러
+    function onKeyDown(e) {
+        // 입력 필드에 포커스가 있으면 키보드 단축키 무시
+        if (document.activeElement === angleInput) {
+            return;
+        }
+
+        switch (e.key) {
+            // Esc: 모달 닫기
+            case 'Escape':
+                if (!helpModal.classList.contains('hidden')) {
+                    closeHelpModal();
+                    e.preventDefault();
+                }
+                break;
+
+            // M 또는 m: 측정 모드 전환
+            case 'M':
+            case 'm':
+                toggleMeasurementMode();
+                e.preventDefault();
+                break;
+
+            // Enter: 각도설정 모드에서 입력 필드로 포커스 이동
+            case 'Enter':
+                if (measurementMode === 'angle-lock') {
+                    angleInput.focus();
+                    angleInput.select(); // 전체 선택
+                    e.preventDefault();
+                }
+                break;
+
+            // . (마침표): 각도 증가
+            case '.':
+                syncLockedAngle();
+                updateAngleWithLock(Math.min(180, lockedAngle + 1));
+                e.preventDefault();
+                break;
+
+            // , (쉼표): 각도 감소 (음수 허용)
+            case ',':
+                syncLockedAngle();
+                updateAngleWithLock(Math.max(-180, lockedAngle - 1));
+                e.preventDefault();
+                break;
+
+            // > (Shift + .): 각도 10도 증가
+            case '>':
+                syncLockedAngle();
+                updateAngleWithLock(Math.min(180, lockedAngle + 10));
+                e.preventDefault();
+                break;
+
+            // < (Shift + ,): 각도 10도 감소 (음수 허용)
+            case '<':
+                syncLockedAngle();
+                updateAngleWithLock(Math.max(-180, lockedAngle - 10));
+                e.preventDefault();
+                break;
+
+            // 숫자키 1-9, 0: 빠른 각도 설정
+            case '1': case '2': case '3': case '4': case '5':
+            case '6': case '7': case '8': case '9': case '0':
+                // 1~5: 양수(10~50), 6~0: 음수(-10~-50)
+                const anglePresets = {
+                    '1': 10, '2': 20, '3': 30, '4': 40, '5': 50,
+                    '6': -10, '7': -20, '8': -30, '9': -40, '0': -50
+                };
+                syncLockedAngle();
+                updateAngleWithLock(anglePresets[e.key]);
+                e.preventDefault();
+                break;
+
+            // / (슬래시): 전후면 카메라 전환
+            case '/':
+                switchCamera();
+                e.preventDefault();
+                break;
+
+            // ; (세미콜론): 기울기선 토글
+            case ';':
+                toggleTiltLine();
+
+                e.preventDefault();
+                break;
+
+            // f: 각도기 눈금 토글
+            case 'f':
+            case 'F':
+                toggleProtractor();
+                e.preventDefault();
+                break;
+
+            // r: 중심점 리셋
+            case 'r':
+            case 'R':
+                resetCenter();
+                e.preventDefault();
+                break;
+
+            // v: 수직선 토글
+            case 'v':
+            case 'V':
+                toggleVerticalLine();
+                e.preventDefault();
+                break;
+
+            // [: 카메라 축소
+            case '[':
+                zoomOut();
+                e.preventDefault();
+                break;
+
+            // ]: 카메라 확대
+            case ']':
+                zoomIn();
+                e.preventDefault();
+                break;
+
+            // W, A, S, D: 중심점 이동
+            case 'w': case 'W':
+            case 'a': case 'A':
+            case 's': case 'S':
+            case 'd': case 'D':
+                const step = e.shiftKey ? 10 : 1;
+                const newCenter = { x: currentCenter.x, y: currentCenter.y };
+
+                switch (e.key.toLowerCase()) {
+                    case 'w': newCenter.y -= step; break;
+                    case 'a': newCenter.x -= step; break;
+                    case 's': newCenter.y += step; break;
+                    case 'd': newCenter.x += step; break;
+                }
+
+                updateCenterFromPoint(newCenter);
+                e.preventDefault();
+                break;
+
+            // E: ESP32 서보 연결 모달 열기
+            case 'e':
+            case 'E':
+                window.openESP32Modal();
+                e.preventDefault();
+                break;
+        }
+    }
+
+    // 각도설정 모드에서 선 위치 업데이트
+    function updateLockedAngleLines() {
+        // line1(수직선)은 수평 기준선과 항상 직각
+        angle1 = gravityAngle + 90;
+
+        // line2는 line1으로부터 lockedAngle만큼 떨어진 위치
+        // 음수일 경우 왼쪽으로, 양수일 경우 오른쪽으로
+        angle2 = angle1 + lockedAngle;
+
+        // angle1 범위 조정 (0-180도 범위 내로)
+        while (angle1 > 180) angle1 -= 180;
+        while (angle1 < 0) angle1 += 180;
+
+        // angle2는 -180 ~ 360 범위를 허용 (음수 각도 지원)
+        // 0-180 범위로 정규화
+        while (angle2 > 180) angle2 -= 180;
+        while (angle2 < 0) angle2 += 180;
+
+        updateLines();
+
+        // ESP32 서보 모터로 각도 전송
+        sendAngleToESP32(lockedAngle);
+    }
+
+    // 수평 기준선 업데이트 (좌우 기울기)
+    function updateGravityLine() {
+        // 중력선의 y 위치를 currentCenter.y로 업데이트
+        gravityLine.setAttribute('y1', currentCenter.y);
+        gravityLine.setAttribute('y2', currentCenter.y);
+        gravityIndicatorLeft.setAttribute('cy', currentCenter.y);
+        gravityIndicatorRight.setAttribute('cy', currentCenter.y);
+
+        // 중심점 기준으로 회전
+        gravityLineGroup.setAttribute('transform', `rotate(${gravityAngle}, ${currentCenter.x}, ${currentCenter.y})`);
+    }
+
+    // 수직 기준선 업데이트 (앞뒤 기울기)
+    function updateTiltLine() {
+        // 수직선의 x 위치를 currentCenter.x로 업데이트
+        tiltLine.setAttribute('x1', currentCenter.x);
+        tiltLine.setAttribute('x2', currentCenter.x);
+        tiltIndicatorTop.setAttribute('cx', currentCenter.x);
+        tiltIndicatorBottom.setAttribute('cx', currentCenter.x);
+
+        // y 위치 설정 (길이 40으로 축소)
+        const lineTop = currentCenter.y - 40;
+        const lineBottom = currentCenter.y;
+        tiltLine.setAttribute('y1', lineTop);
+        tiltLine.setAttribute('y2', lineBottom);
+        tiltIndicatorTop.setAttribute('cy', lineTop);
+        tiltIndicatorBottom.setAttribute('cy', lineBottom);
+
+        // 중심점 기준으로 앞뒤 기울기 표시 (수평 이동으로 표현)
+        const offsetX = tiltAngle * 0.5; // 기울기에 따른 수평 오프셋
+        tiltLineGroup.setAttribute('transform', `translate(${offsetX}, 0)`);
+    }
+
+    // 기울기선 토글
+    // 기울기선 토글
+    function toggleTiltLine() {
+        tiltLineVisible = !tiltLineVisible;
+        if (tiltLineVisible) {
+            tiltLineGroup.style.display = '';
+            toggleTiltLineBtn.classList.remove('off');
+        } else {
+            tiltLineGroup.style.display = 'none';
+            toggleTiltLineBtn.classList.add('off');
+        }
+        console.log('기울기선 표시:', tiltLineVisible);
+    }
+
+    // 각도기 눈금 토글
+    function toggleProtractor() {
+        protractorVisible = !protractorVisible;
+        if (protractorVisible) {
+            protractorGroup.style.display = '';
+            toggleProtractorBtn.classList.remove('off');
+        } else {
+            protractorGroup.style.display = 'none';
+            toggleProtractorBtn.classList.add('off');
+        }
+        console.log('각도기 눈금 표시:', protractorVisible);
+    }
+
+    // 수직선 토글
+    function toggleVerticalLine() {
+        verticalLineVisible = !verticalLineVisible;
+        if (verticalLineVisible) {
+            line1Group.style.display = '';
+            if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.remove('off');
+        } else {
+            line1Group.style.display = 'none';
+            if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
+        }
+        console.log('수직선 표시:', verticalLineVisible);
+    }
+
+    // DeviceOrientation 설정
+    function setupDeviceOrientation() {
+        // iOS 13+ 에서는 권한 요청 필요
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS - 권한 요청은 사용자 제스처 필요 (카메라 시작 버튼 클릭 시)
+            console.log('iOS 기기 감지 - 카메라 시작 시 센서 권한 요청');
+        } else if ('DeviceOrientationEvent' in window) {
+            // Android 및 기타
+            window.addEventListener('deviceorientation', handleOrientation, true);
+            console.log('DeviceOrientation 이벤트 리스너 등록됨');
+        }
+    }
+
+    async function requestOrientationPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation, true);
+                    console.log('iOS 센서 권한 허용됨');
+                }
+            } catch (err) {
+                console.error('센서 권한 요청 실패:', err);
+            }
+        }
+    }
+
+    const SENSITIVITY = 1.0; // 수평 기준선 민감도 (1.0 = 1:1 실제 반응, 낮을수록 둔감)
+
+    function handleOrientation(event) {
+        // gamma: 좌우 기울기 (-90 ~ 90) - 세로 모드
+        // beta: 앞뒤 기울기 (-180 ~ 180) - 가로 모드에서 좌우가 됨
+        // alpha: 나침반 방향 (0 ~ 360)
+
+        if (orientationMode === 'landscape') {
+            // 가로 모드 (우측 회전, 홈버튼이 왼쪽)
+            let beta = event.beta || 0;
+            let gamma = event.gamma || 0;
+
+            // beta(좌우 기울기) 보정
+            let adjustedBeta = beta;
+            if (beta > 90) {
+                adjustedBeta = 180 - beta;
+            } else if (beta < -90) {
+                adjustedBeta = -180 - beta;
+            }
+            gravityAngle = adjustedBeta * SENSITIVITY;    // 민감도 적용
+
+            // 주황색 수직선: 좌우 기울기
+            if (Math.abs(beta) > 90) {
+                tiltAngle = -(gamma - 90);
+            } else {
+                tiltAngle = -(gamma + 90);
+            }
+        } else {
+            // 세로 모드
+            let gamma = event.gamma || 0;
+            gravityAngle = -gamma * SENSITIVITY;        // 민감도 적용
+
+            // 앞뒤 기울기는 beta 사용 (90도 기준에서 얼마나 벗어났는지)
+            let beta = event.beta || 0;
+            tiltAngle = beta - 90;  // 직립 상태가 0이 되도록
+        }
+
+        // 각도 제한 (-45 ~ 45도)
+        gravityAngle = Math.max(-45, Math.min(45, gravityAngle));
+        tiltAngle = Math.max(-45, Math.min(45, tiltAngle));
+
+        updateGravityLine();
+        updateTiltLine();
+
+        // 각도 설정 모드에서는 수평 기준선이 변경되면 수직선도 자동 조정
+        if (measurementMode === 'angle-lock') {
+            // line1(수직선)은 수평 기준선과 항상 직각
+            angle1 = gravityAngle + 90;
+
+            // line2는 line1으로부터 lockedAngle만큼 떨어진 위치
+            angle2 = angle1 + lockedAngle;
+
+            // 각도 범위 조정
+            if (angle1 > 180) angle1 -= 180;
+            if (angle1 < 0) angle1 += 180;
+            if (angle2 > 180) angle2 -= 180;
+            if (angle2 < 0) angle2 += 180;
+
+            updateLines();
+        }
+
+        // 수평 OK 표시 (±임계값 이내면 수평 - 녹색)
+        if (Math.abs(gravityAngle) <= LEVEL_THRESHOLD) {
+            levelOk.classList.remove('hidden');
+        } else {
+            levelOk.classList.add('hidden');
+        }
+
+        // 수직 OK 표시 (±임계값 이내면 수직 - 주황색)
+        // tiltAngle은 가로 모드에서 수직일 때 0이 되도록 보정되어 있음
+        if (Math.abs(tiltAngle) <= LEVEL_THRESHOLD) {
+            tiltOk.classList.remove('hidden');
+        } else {
+            tiltOk.classList.add('hidden');
+        }
+    }
+
+    // 화면 방향 모드 전환
+    function toggleOrientationMode() {
+        const protractorGroup = document.getElementById('protractor-group');
+
+        if (orientationMode === 'landscape') {
+            orientationMode = 'portrait';
+            orientationLabel.textContent = '세로';
+            // 세로 모드 아이콘
+            orientationIcon.innerHTML = '<rect x="6" y="2" width="12" height="20" rx="2" /><line x1="10" y1="12" x2="14" y2="12" />';
+
+            // 세로 모드: viewBox 세로 비율로 변경
+            overlay.setAttribute('viewBox', '0 0 100 150');
+            // 중심점 업데이트
+            currentCenter.y = 140;
+            currentCenter.x = 50;
+
+            // 각도기 위치 하단으로 이동 (transform 대신 직접 좌표 이동)
+            protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+            // 화면 방향 세로로 잠금
+            lockScreenOrientation('portrait');
+        } else {
+            orientationMode = 'landscape';
+            orientationLabel.textContent = '가로';
+            // 가로 모드 아이콘
+            orientationIcon.innerHTML = '<rect x="2" y="6" width="20" height="12" rx="2" /><line x1="12" y1="10" x2="12" y2="14" />';
+
+            // 가로 모드: viewBox 원래대로
+            overlay.setAttribute('viewBox', '0 0 100 100');
+            // 각도기 위치 원래대로 (transform 대신 직접 좌표 이동)
+            protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+            // 중심점 원래대로
+            currentCenter.y = 95;
+            currentCenter.x = 50;
+
+            // 화면 방향 가로로 잠금
+            lockScreenOrientation('landscape');
+        }
+
+        // 라인 및 중력선 위치 업데이트
+        updateLines();
+        updateGravityLine();
+
+        console.log('화면 방향 모드:', orientationMode, 'CENTER:', currentCenter);
+    }
+
+    // 중심점 리셋
+    function resetCenter() {
+        if (orientationMode === 'landscape') {
+            currentCenter.x = 50;
+            currentCenter.y = 95;
+        } else {
+            currentCenter.x = 50;
+            currentCenter.y = 140;
+        }
+
+        // 각도기 그룹 위치 업데이트
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 모든 라인 및 핸들 업데이트
+        updateLines();
+        updateGravityLine();
+        updateTiltLine();
+
+        console.log('중심점 리셋 완료', currentCenter);
+    }
+
+    // 화면 방향 잠금
+    function lockScreenOrientation(orientation) {
+        if (screen.orientation && screen.orientation.lock) {
+            // landscape-primary: 화면 왼쪽이 아래로 가는 가로 방향
+            const lockOrientation = orientation === 'landscape' ? 'landscape-primary' : orientation;
+            screen.orientation.lock(lockOrientation).catch(err => {
+                console.log('화면 방향 잠금 실패 (PWA 필요):', err.message);
+            });
+        }
+    }
+
+    // 측정 모드 전환
+    function toggleMeasurementMode() {
+        if (measurementMode === 'normal') {
+            measurementMode = 'angle-lock';
+            modeLabel.textContent = '각도설정';
+            angleInputPanel.classList.remove('hidden');
+
+            // 핸들 숨기기 (핸들1만 숨김, 핸들2는 조작 가능)
+            handle1.style.display = 'none';
+            handle2.style.display = '';
+
+            // 각도 설정 모드로 전환하면 수직선을 수평기준선과 직각으로 설정
+            angle1 = gravityAngle + 90;
+            angle2 = angle1 + lockedAngle;
+
+            // 각도 범위 조정 (0-180도 범위 내로)
+            if (angle1 > 180) angle1 -= 180;
+            if (angle1 < 0) angle1 += 180;
+            if (angle2 > 180) angle2 -= 180;
+            if (angle2 < 0) angle2 += 180;
+
+            updateLines();
+            console.log('각도 설정 모드로 전환');
+        } else {
+            measurementMode = 'normal';
+            modeLabel.textContent = '일반';
+            angleInputPanel.classList.add('hidden');
+
+            // 핸들 다시 표시 (핸들2만 표시, 핸들1은 고정)
+            handle1.style.display = 'none';
+            handle2.style.display = '';
+
+            // 일반 모드로 돌아오면 수직선은 90도로 고정
+            angle1 = 90;
+            updateLines();
+
+            console.log('일반 모드로 전환');
+        }
+    }
+
+    // 각도 입력 변경 핸들러
+    function onAngleInputChange(e) {
+        const value = parseInt(e.target.value);
+        if (!isNaN(value) && value >= -180 && value <= 180) {
+            lockedAngle = value;
+
+            // 각도 설정 모드일 때만 즉시 업데이트
+            if (measurementMode === 'angle-lock') {
+                updateLockedAngleLines();
+            }
+        }
+    }
+
+    // 각도 입력 필드 keydown 핸들러 (엔터키로 포커스 해제)
+    function onAngleInputKeyDown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
+            // 입력값 적용
+            const value = parseInt(angleInput.value);
+            if (!isNaN(value) && value >= -180 && value <= 180) {
+                updateAngleWithLock(value);
+            }
+            // 포커스 해제하여 키보드 단축키 다시 활성화
+            angleInput.blur();
+
+            // 포커스가 body로 이동하도록 보장
+            document.body.focus();
+        }
+    }
+
+
+    // SVG 좌표 변환
+    function getSVGPoint(clientX, clientY) {
+        const rect = overlay.getBoundingClientRect();
+        const viewBox = overlay.viewBox.baseVal;
+
+        return {
+            x: ((clientX - rect.left) / rect.width) * viewBox.width,
+            y: ((clientY - rect.top) / rect.height) * viewBox.height
+        };
+    }
+
+    // 각도기 그룹 히트 체크 (중심점 드래그)
+    function checkCenterHit(point) {
+        // 중심점 주변 히트 영역
+        const hitRadius = 15;
+        const dist = Math.hypot(point.x - currentCenter.x, point.y - currentCenter.y);
+
+        if (dist < hitRadius) {
+            console.log('Hit center');
+            startDrag('center');
+            return true;
+        }
+        return false;
+    }
+
+    // 포인터 이벤트 핸들러
+    function onPointerDown(e) {
+        const point = getSVGPoint(e.clientX, e.clientY);
+        if (checkCenterHit(point)) return;
+        checkHandleHit(point);
+    }
+
+    function onPointerMove(e) {
+        if (!isDragging || !activeHandle) return;
+        e.preventDefault();
+
+        const point = getSVGPoint(e.clientX, e.clientY);
+
+        if (activeHandle === 'center') {
+            updateCenterFromPoint(point);
+        } else {
+            updateAngleFromPoint(point);
+        }
+    }
+
+    function onPointerUp() {
+        endDrag();
+    }
+
+    // 터치 이벤트 핸들러
+    function onTouchStart(e) {
+        // 핀치 줌 시작 (두 손가락)
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            pinchStartDistance = Math.hypot(
+                touch1.clientX - touch2.clientX,
+                touch1.clientY - touch2.clientY
+            );
+            pinchStartZoom = currentZoom;
+            return;
+        }
+
+        if (e.touches.length !== 1) return;
+        e.preventDefault();
+
+        const touch = e.touches[0];
+        const point = getSVGPoint(touch.clientX, touch.clientY);
+        if (checkCenterHit(point)) return;
+        checkHandleHit(point);
+    }
+
+    function onTouchMove(e) {
+        // 핀치 줌 진행 (두 손가락)
+        if (e.touches.length === 2 && pinchStartDistance > 0) {
+            e.preventDefault();
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDist = Math.hypot(
+                touch1.clientX - touch2.clientX,
+                touch1.clientY - touch2.clientY
+            );
+
+            // 거리 비율에 따른 줌 레벨 계산
+            const scale = currentDist / pinchStartDistance;
+            let newZoom = pinchStartZoom * scale;
+
+            // 범위 제한
+            newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+            applyZoom(newZoom);
+            return;
+        }
+
+        if (!isDragging || !activeHandle || e.touches.length !== 1) return;
+        e.preventDefault();
+
+        const touch = e.touches[0];
+        const point = getSVGPoint(touch.clientX, touch.clientY);
+
+        if (activeHandle === 'center') {
+            updateCenterFromPoint(point);
+        } else {
+            updateAngleFromPoint(point);
+        }
+    }
+
+    function onTouchEnd() {
+        endDrag();
+    }
+
+    // 핸들 히트 체크
+    function checkHandleHit(point) {
+        // 각도 설정 모드에서는 터치로 각도 변경 불가
+        if (measurementMode === 'angle-lock') {
+            return;
+        }
+
+        const handle1Pos = {
+            x: parseFloat(handle1.getAttribute('cx')),
+            y: parseFloat(handle1.getAttribute('cy'))
+        };
+        const handle2Pos = {
+            x: parseFloat(handle2.getAttribute('cx')),
+            y: parseFloat(handle2.getAttribute('cy'))
+        };
+
+        // 터치 영역 크게 확대 (iPad에서 쉽게 터치)
+        const hitRadius = 25;
+
+        const dist1 = Math.hypot(point.x - handle1Pos.x, point.y - handle1Pos.y);
+        const dist2 = Math.hypot(point.x - handle2Pos.x, point.y - handle2Pos.y);
+
+        console.log('Touch point:', point, 'Handle1:', handle1Pos, 'Handle2:', handle2Pos);
+        console.log('Distances:', dist1, dist2, 'Hit radius:', hitRadius);
+
+        const handle1Visible = handle1.style.display !== 'none';
+
+        if (handle1Visible && dist1 < hitRadius && dist1 <= dist2) {
+            console.log('Hit handle 1');
+            startDrag(1);
+            updateAngleFromPoint(point);  // 즉시 각도 업데이트
+        } else if (dist2 < hitRadius) {
+            console.log('Hit handle 2');
+            startDrag(2);
+            updateAngleFromPoint(point);  // 즉시 각도 업데이트
+        }
+    }
+
+    function startDrag(handleNum) {
+        isDragging = true;
+        activeHandle = handleNum;
+
+        const group = handleNum === 1 ? line1Group : (handleNum === 2 ? line2Group : null);
+        if (group) group.classList.add('active');
+        if (handleNum === 'center') {
+            document.body.style.cursor = 'move';
+        }
+    }
+
+    function endDrag() {
+        if (activeHandle) {
+            const group = activeHandle === 1 ? line1Group : (activeHandle === 2 ? line2Group : null);
+            if (group) group.classList.remove('active');
+        }
+        document.body.style.cursor = '';
+
+        isDragging = false;
+        activeHandle = null;
+    }
+
+    function updateCenterFromPoint(point) {
+        currentCenter.x = point.x;
+        currentCenter.y = point.y;
+
+        // 각도기 그룹 위치 업데이트
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 모든 라인 및 핸들 업데이트
+        updateLines();
+        updateGravityLine();
+        updateTiltLine();
+    }
+
+    function updateAngleFromPoint(point) {
+        // 각도 설정 모드: handle2를 움직여서 lockedAngle 조정
+        if (measurementMode === 'angle-lock') {
+            if (activeHandle !== 2) return;
+
+            const dx = currentCenter.x - point.x;
+            const dy = currentCenter.y - point.y;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+            // 현재 angle1(수직선)과의 차이를 계산
+            // angle2 = angle1 + lockedAngle  =>  lockedAngle = angle2 - angle1
+            let diff = angle - angle1;
+
+            // 정규화 (-180 ~ 180)
+            while (diff > 180) diff -= 360;
+            while (diff < -180) diff += 360;
+
+            lockedAngle = Math.round(diff); // 정수로 반올림
+
+            // 입력 필드 업데이트
+            angleInput.value = lockedAngle;
+
+            // 라인 업데이트
+            updateLockedAngleLines();
+            return;
+        }
+
+        // 일반 모드: 각도와 거리 모두 업데이트
+        const dx = currentCenter.x - point.x;
+        const dy = currentCenter.y - point.y;
+        let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        let distance = Math.hypot(dx, dy);
+
+        // 각도 범위 제한 제거 - 연장선까지 이동 가능
+        if (angle < -45) angle = -45;
+        if (angle > 225) angle = 225;
+
+        // 거리 범위 제한
+        distance = Math.max(MIN_HANDLE_DISTANCE, Math.min(MAX_HANDLE_DISTANCE, distance));
+
+        if (activeHandle === 1) {
+            angle1 = angle;
+            handleDistance1 = distance;
+        } else {
+            angle2 = angle;
+            handleDistance2 = distance;
+        }
+
+        updateLines();
+    }
+
+    // 카메라 접근
+    async function requestCameraAccess() {
+        // 권한 요청 오버레이 표시
+        showPermissionOverlay();
+    }
+
+    function showPermissionOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'permission-overlay';
+        overlay.innerHTML = `
+            <h1>📐 AR 각도기</h1>
+            <p>카메라를 사용하여 실제 물체의 각도를 측정할 수 있습니다.</p>
+            <button id="start-camera">카메라 시작</button>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('start-camera').addEventListener('click', async () => {
+            try {
+                // iOS에서 센서 권한 요청
+                await requestOrientationPermission();
+                await startCamera();
+                overlay.remove();
+
+                // 키보드 단축키가 작동하도록 포커스 설정
+                document.body.focus();
+                // tabindex를 설정하여 body가 포커스를 받을 수 있게 함
+                document.body.setAttribute('tabindex', '-1');
+                document.body.focus();
+            } catch (err) {
+                console.error('카메라 접근 실패:', err);
+                overlay.querySelector('p').textContent =
+                    '카메라 접근이 거부되었습니다. 설정에서 카메라 권한을 허용해 주세요.';
+            }
+        });
+    }
+
+    async function startCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+            video: {
+                facingMode: facingMode,
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        };
+
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+
+        // 전면 카메라일 경우 좌우 반전 (거울 모드)
+        if (facingMode === 'user') {
+            video.style.transform = 'scaleX(-1)';
+        } else {
+            video.style.transform = '';
+        }
+
+        // 줌 기능 확인 및 초기화
+        const track = currentStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        if ('zoom' in capabilities) {
+            minZoom = capabilities.zoom.min;
+            maxZoom = capabilities.zoom.max;
+            // 현재 줌 상태 유지 (또는 minZoom으로 초기화)
+            if (currentZoom < minZoom || currentZoom > maxZoom) {
+                currentZoom = minZoom;
+            }
+            applyZoom(currentZoom);
+            console.log(`줌 기능 지원: ${minZoom} ~ ${maxZoom}`);
+        } else {
+            console.log('줌 기능 미지원');
+        }
+    }
+
+
+
+    // 줌 적용 헬퍼 함수
+    async function applyZoom(zoom) {
+        if (!currentStream) return;
+        if (isApplyingZoom) return; // 이미 적용 중이면 무시 (스로틀링)
+
+        isApplyingZoom = true;
+        try {
+            const track = currentStream.getVideoTracks()[0];
+            await track.applyConstraints({ advanced: [{ zoom: zoom }] });
+            currentZoom = zoom;
+        } catch (err) {
+            console.error('줌 적용 실패:', err);
+        } finally {
+            isApplyingZoom = false;
+        }
+    }
+
+    // 줌 인 함수
+    function zoomIn() {
+        if (maxZoom <= 1) {
+            console.log('줌 기능 미지원');
+            return;
+        }
+        const newZoom = Math.min(maxZoom, currentZoom + ZOOM_STEP);
+        applyZoom(newZoom);
+    }
+
+    // 줌 아웃 함수
+    function zoomOut() {
+        if (maxZoom <= 1) {
+            console.log('줌 기능 미지원');
+            return;
+        }
+        const newZoom = Math.max(minZoom, currentZoom - ZOOM_STEP);
+        applyZoom(newZoom);
+    }
+
+    // 각도 동기화 (일반 모드 상태를 lockedAngle에 반영)
+    function syncLockedAngle() {
+        if (measurementMode === 'normal') {
+            let diff = angle2 - angle1;
+            while (diff > 180) diff -= 360;
+            while (diff < -180) diff += 360;
+            lockedAngle = Math.round(diff);
+        }
+    }
+
+    // 각도 업데이트 및 적용 (모드에 따라 분기)
+    function updateAngleWithLock(newAngle) {
+        lockedAngle = newAngle;
+        angleInput.value = lockedAngle;
+
+        if (measurementMode === 'angle-lock') {
+            updateLockedAngleLines();
+        } else {
+            // 일반 모드: angle1은 그대로 두고 angle2만 변경
+            // angle2 = angle1 + lockedAngle
+            angle2 = angle1 + lockedAngle;
+
+            // angle2 정규화
+            while (angle2 > 180) angle2 -= 180;
+            while (angle2 < 0) angle2 += 180;
+
+            updateLines();
+
+            // ESP32 서보 모터로 각도 전송
+            sendAngleToESP32(lockedAngle);
+        }
+    }
+
+    async function switchCamera() {
+        facingMode = facingMode === 'environment' ? 'user' : 'environment';
+
+        try {
+            await startCamera();
+        } catch (err) {
+            console.error('카메라 전환 실패:', err);
+            // 실패 시 원래 모드로 복구
+            facingMode = facingMode === 'environment' ? 'user' : 'environment';
+        }
+    }
+
+    // 도움말 모달 함수 (전역 노출)
+    window.openHelpModal = function () {
+        const modal = document.getElementById('help-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // 모달이 뜰 때 포커스 해제 (키보드 입력 방지 등)
+            document.activeElement.blur();
+        }
+    };
+
+    window.closeHelpModal = function () {
+        const modal = document.getElementById('help-modal');
+        if (modal) modal.classList.add('hidden');
+    };
+
+    // ===== ESP32 서보 모터 제어 함수들 =====
+
+    // ESP32 연결 테스트
+    async function testESP32Connection() {
+        // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content)
+        if (window.location.protocol === 'https:') {
+            showESP32Message('HTTPS 페이지에서는 ESP32(HTTP)에 연결할 수 없습니다. 아래 링크로 직접 접속하세요.', 'error');
+            updateESP32Status('disconnected');
+            return;
+        }
+
+        updateESP32Status('connecting');
+        showESP32Message('연결 테스트 중...', 'info');
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/status`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                esp32Connected = true;
+                updateESP32Status('connected');
+                showESP32Message(`연결 성공! 현재 각도: ${data.angle}°`, 'success');
+                console.log('ESP32 연결됨:', data);
+
+                // 현재 각도 동기화
+                sendAngleToESP32(lockedAngle);
+            } else {
+                throw new Error('응답 오류');
+            }
+        } catch (err) {
+            esp32Connected = false;
+            updateESP32Status('disconnected');
+
+            if (err.name === 'AbortError') {
+                showESP32Message('연결 시간 초과. WiFi 연결을 확인하세요.', 'error');
+            } else {
+                showESP32Message('연결 실패. ESP32 WiFi에 연결되어 있는지 확인하세요.', 'error');
+            }
+            console.error('ESP32 연결 실패:', err);
+        }
+    }
+
+    // ESP32 연결 해제
+    function disconnectESP32() {
+        esp32Connected = false;
+        updateESP32Status('disconnected');
+        showESP32Message('연결이 해제되었습니다.', 'info');
+        console.log('ESP32 연결 해제');
+    }
+
+    // ESP32 자동 연결 시도 (백그라운드, 조용히)
+    async function autoConnectESP32() {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/status`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                esp32Connected = true;
+                updateESP32Status('connected');
+                console.log('ESP32 자동 연결 성공:', data);
+
+                // 현재 각도 동기화
+                sendAngleToESP32(lockedAngle);
+            }
+        } catch (err) {
+            // 자동 연결 실패 시 조용히 무시 (사용자에게 알림 없음)
+            console.log('ESP32 자동 연결 안됨 (WiFi 미연결 상태)');
+        }
+    }
+
+    // ESP32로 각도 전송 (디바운스 적용, WiFi 또는 BLE)
+    function sendAngleToESP32(angle) {
+        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
+        if (!esp32Connected && !bleConnected) return;
+
+        // 디바운스: 이전 타이머 취소
+        if (esp32SendTimeout) {
+            clearTimeout(esp32SendTimeout);
+        }
+
+        esp32SendTimeout = setTimeout(async () => {
+            // BLE 연결된 경우 우선
+            if (bleConnected && bleAngleCharacteristic) {
+                try {
+                    // 호환성을 위해 TextEncoder 대신 직접 변환
+                    const str = String(angle);
+                    const bytes = new Uint8Array(str.length);
+                    for (let i = 0; i < str.length; i++) {
+                        bytes[i] = str.charCodeAt(i);
+                    }
+
+                    // 1. writeValueWithoutResponse 시도 (안드로이드 멈춤 방지)
+                    if (bleAngleCharacteristic.writeValueWithoutResponse) {
+                        try {
+                            await bleAngleCharacteristic.writeValueWithoutResponse(bytes);
+                            console.log(`BLE(NR) 각도 전송 성공: ${angle}°`);
+                            writeToDebugLog(`전송(NR) 성공: ${angle}°`, 'success');
+                            return;
+                        } catch (nrErr) {
+                            console.warn('BLE NR 전송 실패, 일반 전송 시도:', nrErr);
+                            writeToDebugLog(`NR 전송 실패: ${nrErr.message}`, 'warn');
+                        }
+                    }
+
+                    // 2. 기존 writeValue (응답 대기) - NR 실패하거나 미지원 시
+                    await bleAngleCharacteristic.writeValue(bytes);
+                    console.log(`BLE 각도 전송 성공: ${angle}°`);
+                    writeToDebugLog(`전송 성공: ${angle}°`, 'success');
+                } catch (err) {
+                    console.error('BLE 각도 전송 오류:', err);
+                    writeToDebugLog(`전송 오류: ${err.message}`, 'error');
+                    if (err.message && err.message.includes('GATT')) {
+                        handleBLEDisconnect();
+                    }
+                }
+                return;
+            }
+
+            // WiFi 연결된 경우
+            if (esp32Connected) {
+                try {
+                    const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}`, {
+                        method: 'GET'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`WiFi 각도 전송 성공: ${angle}° → 서보: ${data.servoAngle}°`);
+                    } else {
+                        console.error('WiFi 각도 전송 실패:', response.status);
+                    }
+                } catch (err) {
+                    console.error('WiFi 각도 전송 오류:', err);
+                    // 연결 끊김 감지
+                    if (esp32Connected) {
+                        esp32Connected = false;
+                        connectionMode = 'none';
+                        updateESP32Status('disconnected');
+                    }
+                }
+            }
+        }, ESP32_SEND_DEBOUNCE);
+    }
+
+    // BLE 연결 시도
+    async function connectBLE() {
+        writeToDebugLog('BLE 연결 시도 중...', 'info');
+
+        // Web Bluetooth API 지원 확인
+        if (!navigator.bluetooth) {
+            writeToDebugLog('Web Bluetooth 미지원 브라우저', 'error');
+            showESP32Message('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.', 'error');
+            return;
+        }
+
+        updateESP32Status('connecting');
+        showESP32Message('블루투스 장치 검색 중... (Protractor-Servo 선택)', 'info');
+
+        try {
+            // 블루투스 장치 요청 - 모든 장치 표시 (호환성 우선)
+            writeToDebugLog('장치 검색 요청 (acceptAllDevices)...', 'info');
+            bleDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [BLE_SERVICE_UUID]
+            });
+
+            writeToDebugLog(`장치 선택됨: ${bleDevice.name} (${bleDevice.id})`, 'success');
+
+            showESP32Message('장치 연결 중...', 'info');
+
+            // 연결 해제 이벤트 리스너
+            bleDevice.addEventListener('gattserverdisconnected', handleBLEDisconnect);
+
+            // GATT 서버 연결
+            writeToDebugLog('GATT 서버 연결 중...', 'info');
+            bleServer = await bleDevice.gatt.connect();
+            writeToDebugLog('GATT 서버 연결 성공', 'success');
+
+            // 서비스 가져오기
+            writeToDebugLog(`서비스 검색: ${BLE_SERVICE_UUID}`, 'info');
+            const service = await bleServer.getPrimaryService(BLE_SERVICE_UUID);
+
+            // 각도 특성 가져오기
+            writeToDebugLog('각도 특성 가져오는 중...', 'info');
+            bleAngleCharacteristic = await service.getCharacteristic(BLE_ANGLE_CHAR_UUID);
+            writeToDebugLog('각도 특성 획득 성공', 'success');
+
+            // 연결 성공
+            bleConnected = true;
+            connectionMode = 'ble';
+            updateESP32Status('connected');
+            showESP32Message('🔵 블루투스 연결 성공!', 'success');
+            console.log('BLE 연결됨:', bleDevice.name);
+
+            // 현재 각도 동기화
+            sendAngleToESP32(lockedAngle);
+
+        } catch (err) {
+            console.error('BLE 연결 오류:', err);
+            bleConnected = false;
+            connectionMode = 'none';
+            updateESP32Status('disconnected');
+
+            if (err.name === 'NotFoundError') {
+                showESP32Message('장치를 찾을 수 없습니다. ESP32가 켜져 있는지 확인하세요.', 'error');
+            } else if (err.name === 'SecurityError') {
+                showESP32Message('블루투스 권한이 거부되었습니다.', 'error');
+            } else {
+                showESP32Message('블루투스 연결 실패: ' + err.message, 'error');
+            }
+        }
+    }
+
+    // BLE 연결 해제 처리
+    function handleBLEDisconnect() {
+        console.log('BLE 연결 해제됨');
+        bleConnected = false;
+        bleAngleCharacteristic = null;
+        bleServer = null;
+
+        if (connectionMode === 'ble') {
+            connectionMode = 'none';
+            updateESP32Status('disconnected');
+            showESP32Message('블루투스 연결이 해제되었습니다.', 'info');
+        }
+    }
+
+    // BLE 연결 해제
+    function disconnectBLE() {
+        if (bleDevice && bleDevice.gatt.connected) {
+            bleDevice.gatt.disconnect();
+        }
+        bleConnected = false;
+        bleAngleCharacteristic = null;
+        bleServer = null;
+        bleDevice = null;
+        connectionMode = 'none';
+        updateESP32Status('disconnected');
+        showESP32Message('블루투스 연결이 해제되었습니다.', 'info');
+        console.log('BLE 연결 해제');
+    }
+
+    // ESP32 상태 UI 업데이트
+    function updateESP32Status(status) {
+        // 버튼 상태 도트
+        if (esp32StatusDot) {
+            esp32StatusDot.className = 'status-dot ' + status;
+        }
+
+        // 버튼 클래스
+        if (esp32ConnectBtn) {
+            if (status === 'connected') {
+                esp32ConnectBtn.classList.add('connected');
+            } else {
+                esp32ConnectBtn.classList.remove('connected');
+            }
+        }
+
+        // 모달 내 상태 카드
+        if (esp32ConnectionStatus) {
+            const statusIcon = esp32ConnectionStatus.querySelector('.status-icon');
+            const statusText = esp32ConnectionStatus.querySelector('span');
+
+            if (statusIcon) {
+                statusIcon.className = 'status-icon ' + status;
+            }
+
+            if (statusText) {
+                switch (status) {
+                    case 'connected':
+                        statusText.textContent = '연결됨';
+                        break;
+                    case 'connecting':
+                        statusText.textContent = '연결 중...';
+                        break;
+                    default:
+                        statusText.textContent = '연결 안됨';
+                }
+            }
+        }
+
+        // 버튼 표시/숨김
+        if (esp32TestBtn && esp32DisconnectBtn) {
+            if (status === 'connected') {
+                esp32TestBtn.classList.add('hidden');
+                esp32DisconnectBtn.classList.remove('hidden');
+            } else {
+                esp32TestBtn.classList.remove('hidden');
+                esp32DisconnectBtn.classList.add('hidden');
+            }
+        }
+    }
+
+    // ESP32 메시지 표시
+    function showESP32Message(message, type) {
+        if (esp32Message) {
+            esp32Message.textContent = message;
+            esp32Message.className = 'esp32-message ' + type;
+            esp32Message.classList.remove('hidden');
+
+            // 성공/오류 메시지는 5초 후 자동 숨김
+            if (type !== 'info') {
+                setTimeout(() => {
+                    esp32Message.classList.add('hidden');
+                }, 5000);
+            }
+        }
+    }
+
+    // 디버그 로그 함수
+    function writeToDebugLog(message, type = 'info') {
+        const debugConsole = document.getElementById('debug-console');
+        const debugLog = document.getElementById('debug-log');
+
+        if (debugConsole && debugLog) {
+            debugConsole.style.display = 'block'; // 로그 발생 시 콘솔 표시
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+
+            const time = new Date().toLocaleTimeString().split(' ')[0]; // 시:분:초 만
+            entry.textContent = `[${time}] ${message}`;
+
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+        console.log(`[Debug] ${message}`);
+    }
+
+    function clearDebugLog() {
+        const debugLog = document.getElementById('debug-log');
+        if (debugLog) debugLog.innerHTML = '';
+    }
+
+    // ESP32 모달 열기/닫기 (전역 노출)
+    window.openESP32Modal = function () {
+        if (esp32Modal) {
+            esp32Modal.classList.remove('hidden');
+            document.activeElement.blur();
+
+            // 모달 열 때 디버그 콘솔 표시
+            const debugConsole = document.getElementById('debug-console');
+            if (debugConsole) debugConsole.style.display = 'block';
+        }
+    };
+
+    window.closeESP32Modal = function () {
+        if (esp32Modal) {
+            esp32Modal.classList.add('hidden');
+        }
+    };
+
+    // ESP32 연결 테스트 (전역 노출)
+    window.testESP32Connection = testESP32Connection;
+    window.disconnectESP32 = disconnectESP32;
+
+    // BLE 연결 함수 (전역 노출)
+    window.connectBLE = connectBLE;
+    window.disconnectBLE = disconnectBLE;
+
+    // 디버그 함수 노출
+    window.writeToDebugLog = writeToDebugLog;
+    window.clearDebugLog = clearDebugLog;
+
+    // ESP32 버튼 클릭 이벤트 (모달 열기)
+    if (esp32ConnectBtn) {
+        esp32ConnectBtn.addEventListener('click', () => {
+            window.openESP32Modal();
+        });
+    }
+})();
+
+)rawliteral";
+
+#endif

@@ -19,6 +19,7 @@
  *   - 각도 특성 UUID: 12345678-1234-5678-1234-56789abcdef1
  */
 
+#include "web_assets.h" // 웹앱 파일 포함 (index.html, styles.css, app.js)
 #include <BLE2902.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -140,6 +141,9 @@ void setup() {
 
   // 웹서버 라우트 설정
   server.on("/", handleRoot);
+  server.on("/index.html", handleRoot);
+  server.on("/styles.css", handleStyles);
+  server.on("/app.js", handleAppJS);
   server.on("/angle", handleAngle);
   server.on("/status", handleStatus);
   server.onNotFound(handleNotFound);
@@ -252,42 +256,22 @@ void handleCORS() {
 }
 
 // 루트 페이지
+// 루트 페이지 (Embeded Index HTML)
 void handleRoot() {
   addCORSHeaders();
+  server.send(200, "text/html", index_html);
+}
 
-  String html = "<!DOCTYPE html><html><head>";
-  html += "<meta charset='UTF-8'>";
-  html +=
-      "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<title>Protractor Servo Controller</title>";
-  html += "<style>";
-  html += "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', "
-          "Roboto, sans-serif; ";
-  html += "max-width: 400px; margin: 50px auto; padding: 20px; text-align: "
-          "center; ";
-  html += "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); "
-          "min-height: 100vh; }";
-  html += ".card { background: white; border-radius: 20px; padding: 30px; "
-          "box-shadow: 0 10px 40px rgba(0,0,0,0.2); }";
-  html += "h1 { color: #333; margin-bottom: 20px; }";
-  html += ".angle { font-size: 48px; font-weight: bold; color: #667eea; }";
-  html += ".label { color: #666; margin-top: 10px; }";
-  html += ".status { margin-top: 20px; padding: 10px; background: #e8f5e9; "
-          "border-radius: 10px; color: #2e7d32; }";
-  html += ".ble-status { margin-top: 10px; padding: 10px; background: #e3f2fd; "
-          "border-radius: 10px; color: #1565c0; }";
-  html += "</style></head><body>";
-  html += "<div class='card'>";
-  html += "<h1>📐 Protractor Servo</h1>";
-  html += "<div class='angle'>" + String(currentAngle) + "°</div>";
-  html += "<div class='label'>현재 각도</div>";
-  html += "<div class='status'>✓ WiFi 연결됨</div>";
-  html += "<div class='ble-status'>";
-  html += bleDeviceConnected ? "🔵 BLE 연결됨" : "⚪ BLE 대기 중";
-  html += "</div>";
-  html += "</div></body></html>";
+// 스타일 시트 (Embeded CSS)
+void handleStyles() {
+  addCORSHeaders();
+  server.send(200, "text/css", styles_css);
+}
 
-  server.send(200, "text/html", html);
+// 앱 스크립트 (Embeded JS)
+void handleAppJS() {
+  addCORSHeaders();
+  server.send(200, "application/javascript", app_js);
 }
 
 // 각도 설정 엔드포인트
