@@ -1277,6 +1277,13 @@
 
     // ESP32 연결 테스트
     async function testESP32Connection() {
+        // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content)
+        if (window.location.protocol === 'https:') {
+            showESP32Message('HTTPS 페이지에서는 ESP32(HTTP)에 연결할 수 없습니다. 아래 링크로 직접 접속하세요.', 'error');
+            updateESP32Status('disconnected');
+            return;
+        }
+
         updateESP32Status('connecting');
         showESP32Message('연결 테스트 중...', 'info');
 

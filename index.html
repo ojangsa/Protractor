@@ -277,6 +277,15 @@
                         </ol>
                     </div>
 
+                    <!-- HTTPS 제한 안내 -->
+                    <div class="esp32-https-notice" id="esp32-https-notice">
+                        <p>⚠️ <strong>HTTPS 보안 제한</strong></p>
+                        <p>이 페이지가 HTTPS로 로드되어 ESP32(HTTP)에 직접 연결할 수 없습니다.</p>
+                        <a href="http://192.168.4.1" target="_blank" class="esp32-direct-link">
+                            📡 ESP32 직접 접속하기
+                        </a>
+                    </div>
+
                     <div class="esp32-actions">
                         <button id="esp32-test-btn" class="esp32-action-btn" onclick="testESP32Connection()">
                             연결 테스트

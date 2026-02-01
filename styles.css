@@ -704,18 +704,24 @@ body {
 }
 
 @keyframes pulse-green {
-    0%, 100% {
+
+    0%,
+    100% {
         box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4);
     }
+
     50% {
         box-shadow: 0 0 0 4px rgba(52, 199, 89, 0);
     }
 }
 
 @keyframes pulse-orange {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -858,4 +864,42 @@ body {
     background: rgba(0, 122, 255, 0.2);
     color: #007AFF;
     border: 1px solid rgba(0, 122, 255, 0.3);
+}
+
+/* ESP32 HTTPS 제한 안내 */
+.esp32-https-notice {
+    background: rgba(255, 149, 0, 0.15);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-https-notice p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-https-notice p:first-child {
+    color: #FF9500;
+    font-size: 14px;
+}
+
+.esp32-direct-link {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.esp32-direct-link:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
 }
