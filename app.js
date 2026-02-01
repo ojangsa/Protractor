@@ -1440,10 +1440,21 @@
         showESP32Message('블루투스 장치 검색 중...', 'info');
 
         try {
-            // 블루투스 장치 요청
+            // 블루투스 장치 요청 (이름 또는 서비스 UUID로 필터링)
             bleDevice = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'Protractor-Servo' }],
+                // 이름 필터와 서비스 필터 모두 시도
+                filters: [
+                    { name: 'Protractor-Servo' },
+                    { namePrefix: 'Protractor' },
+                    { services: [BLE_SERVICE_UUID] }
+                ],
                 optionalServices: [BLE_SERVICE_UUID]
+            }).catch(async () => {
+                // 필터가 실패하면 모든 장치 표시
+                return await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [BLE_SERVICE_UUID]
+                });
             });
 
             showESP32Message('장치 연결 중...', 'info');
