@@ -1390,8 +1390,14 @@
             // BLE 연결된 경우 우선
             if (bleConnected && bleAngleCharacteristic) {
                 try {
-                    const encoder = new TextEncoder();
-                    await bleAngleCharacteristic.writeValue(encoder.encode(String(angle)));
+                    // 호환성을 위해 TextEncoder 대신 직접 변환
+                    const str = String(angle);
+                    const bytes = new Uint8Array(str.length);
+                    for (let i = 0; i < str.length; i++) {
+                        bytes[i] = str.charCodeAt(i);
+                    }
+
+                    await bleAngleCharacteristic.writeValue(bytes);
                     console.log(`BLE 각도 전송 성공: ${angle}°`);
                 } catch (err) {
                     console.error('BLE 각도 전송 오류:', err);

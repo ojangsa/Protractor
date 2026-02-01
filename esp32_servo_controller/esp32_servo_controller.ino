@@ -78,10 +78,17 @@ class ServerCallbacks : public BLEServerCallbacks {
 // BLE 특성 콜백 (각도 쓰기)
 class AngleCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pCharacteristic) {
+    // getValue()가 String을 반환함
     String value = pCharacteristic->getValue();
+
+    Serial.print("BLE 데이터 수신 (길이: ");
+    Serial.print(value.length());
+    Serial.print("): ");
+
     if (value.length() > 0) {
+      // String을 int로 파싱
       int angle = value.toInt();
-      Serial.print("BLE로 각도 수신: ");
+      Serial.print("파싱된 각도: ");
       Serial.println(angle);
 
       // 범위 확인 후 서보 설정
@@ -92,7 +99,11 @@ class AngleCallbacks : public BLECharacteristicCallbacks {
         String status = String(currentAngle);
         pStatusCharacteristic->setValue(status);
         pStatusCharacteristic->notify();
+      } else {
+        Serial.println("각도 범위 초과!");
       }
+    } else {
+      Serial.println("빈 데이터");
     }
   }
 };
