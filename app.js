@@ -175,6 +175,17 @@
         setupDeviceOrientation();
         requestCameraAccess();
 
+        // 초기화 완료 표시
+        const statusDiv = document.getElementById('js-status');
+        if (statusDiv) {
+            statusDiv.textContent = 'App Ready (Touch OK)';
+            statusDiv.style.color = 'green';
+            setTimeout(() => statusDiv.style.display = 'none', 3000);
+        }
+        if (window.writeToDebugLog) { // Ensure writeToDebugLog is defined
+            writeToDebugLog('앱 초기화 완료', 'success');
+        }
+
         // 가로 모드 전용 (세로 모드 비활성화)
         orientationMode = 'landscape';
         overlay.setAttribute('viewBox', '0 0 100 100');
