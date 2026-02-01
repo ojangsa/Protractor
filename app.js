@@ -154,9 +154,16 @@
         // 일반 모드로 시작 (핸들 드래그 가능, 단 핸들1은 고정)
         handle1.style.display = 'none';
 
-        // 수직선 초기 상태: 꿄
+        // 수직선 초기 상태: 꺼짐
         line1Group.style.display = 'none';
         if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
+
+        // HTTP 환경에서 ESP32 자동 연결 시도
+        if (window.location.protocol === 'http:') {
+            setTimeout(() => {
+                autoConnectESP32();
+            }, 2000); // 2초 후 자동 연결 시도
+        }
 
         // 키보드 단축키가 바로 작동하도록 포커스 설정
         document.body.focus();
@@ -1329,6 +1336,34 @@
         updateESP32Status('disconnected');
         showESP32Message('연결이 해제되었습니다.', 'info');
         console.log('ESP32 연결 해제');
+    }
+
+    // ESP32 자동 연결 시도 (백그라운드, 조용히)
+    async function autoConnectESP32() {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/status`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                esp32Connected = true;
+                updateESP32Status('connected');
+                console.log('ESP32 자동 연결 성공:', data);
+
+                // 현재 각도 동기화
+                sendAngleToESP32(lockedAngle);
+            }
+        } catch (err) {
+            // 자동 연결 실패 시 조용히 무시 (사용자에게 알림 없음)
+            console.log('ESP32 자동 연결 안됨 (WiFi 미연결 상태)');
+        }
     }
 
     // ESP32로 각도 전송 (디바운스 적용)
