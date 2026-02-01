@@ -254,10 +254,12 @@ void handleCORS() {
 }
 
 // 루트 페이지
-// 루트 페이지 (Merged Index HTML)
+// 루트 페이지 (Gzipped + Merged)
 void handleRoot() {
   addCORSHeaders();
-  server.send(200, "text/html", index_html);
+  server.sendHeader("Content-Encoding", "gzip");
+  server.send_P(200, "text/html", (const char *)index_html_gz,
+                index_html_gz_len);
 }
 
 // 각도 설정 엔드포인트

@@ -1,5 +1,6 @@
 import os
 import re
+import gzip
 
 # 파일 경로
 base_path = "../"
@@ -26,25 +27,32 @@ css_content = read_file(files["css"])
 js_content = read_file(files["js"])
 
 # CSS 인라인화
-# <link rel="stylesheet" href="styles.css"> 찾아서 교체
 css_pattern = r'<link[^>]*href=["\']styles\.css["\'][^>]*>'
 html_content = re.sub(css_pattern, f'<style>\n{css_content}\n</style>', html_content)
 
 # JS 인라인화
-# <script src="app.js"></script> 찾아서 교체
+# $ 같은 특수문자 처리를 위해 replace 대신 lambda 사용 권장되나,
+# 여기서는 단순 치환을 위해 lambda 사용
 js_pattern = r'<script[^>]*src=["\']app\.js["\'][^>]*>\s*</script>'
-# app.js 내용에 $ 같은 특수문자가 있을 수 있으므로 단순 replace가 안전할 수 있음
-# 하지만 re.sub을 쓰되 lambda를 쓰면 안전
 html_content = re.sub(js_pattern, lambda match: f'<script>\n{js_content}\n</script>', html_content)
 
-# 헤더 파일 생성
-header_content = """#ifndef WEB_ASSETS_H
-#define WEB_ASSETS_H
+# Gzip 압축
+compressed_data = gzip.compress(html_content.encode('utf-8'))
+data_len = len(compressed_data)
 
-// Merged HTML (index.html + styles.css + app.js)
-const char* index_html = R"rawliteral(
-""" + html_content + """
-)rawliteral";
+# C 배열 생성
+hex_array = ", ".join(f"0x{b:02x}" for b in compressed_data)
+
+# 헤더 파일 생성
+header_content = f"""#ifndef WEB_ASSETS_H
+#define WEB_ASSETS_H
+#include <pgmspace.h>
+
+// Gzipped Merged HTML
+const uint32_t index_html_gz_len = {data_len};
+const uint8_t index_html_gz[] PROGMEM = {{
+{hex_array}
+}};
 
 #endif
 """
@@ -52,4 +60,4 @@ const char* index_html = R"rawliteral(
 with open(output_path, "w", encoding="utf-8") as f:
     f.write(header_content)
 
-print(f"Successfully generated {output_path} (Merged Single File)")
+print(f"Successfully generated {output_path} (Gzipped: {data_len} bytes)")
