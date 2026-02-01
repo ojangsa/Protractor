@@ -1397,11 +1397,23 @@
                         bytes[i] = str.charCodeAt(i);
                     }
 
+                    // 1. writeValueWithoutResponse 시도 (안드로이드 멈춤 방지)
+                    if (bleAngleCharacteristic.writeValueWithoutResponse) {
+                        try {
+                            await bleAngleCharacteristic.writeValueWithoutResponse(bytes);
+                            console.log(`BLE(NR) 각도 전송 성공: ${angle}°`);
+                            return;
+                        } catch (nrErr) {
+                            console.warn('BLE NR 전송 실패, 일반 전송 시도:', nrErr);
+                        }
+                    }
+
+                    // 2. 기존 writeValue (응답 대기) - NR 실패하거나 미지원 시
                     await bleAngleCharacteristic.writeValue(bytes);
                     console.log(`BLE 각도 전송 성공: ${angle}°`);
                 } catch (err) {
                     console.error('BLE 각도 전송 오류:', err);
-                    if (err.message.includes('GATT')) {
+                    if (err.message && err.message.includes('GATT')) {
                         handleBLEDisconnect();
                     }
                 }
