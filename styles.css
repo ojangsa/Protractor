@@ -903,3 +903,101 @@ body {
     transform: scale(1.02);
     box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
 }
+
+/* 연결 옵션 컨테이너 */
+.esp32-connection-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 블루투스 섹션 */
+.esp32-ble-section {
+    background: rgba(0, 122, 255, 0.1);
+    border: 1px solid rgba(0, 122, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-ble-section p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-ble-section p:first-child {
+    color: #007AFF;
+    font-size: 15px;
+}
+
+.ble-desc,
+.wifi-desc {
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.ble-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%) !important;
+    margin-top: 8px;
+}
+
+.ble-btn:hover {
+    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
+}
+
+/* WiFi 섹션 */
+.esp32-wifi-section {
+    background: rgba(255, 149, 0, 0.1);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.esp32-wifi-section p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.esp32-wifi-section p:first-child {
+    color: #FF9500;
+    font-size: 15px;
+}
+
+.wifi-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%) !important;
+    margin-top: 8px;
+}
+
+.wifi-btn:hover {
+    box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
+}
+
+/* 구분선 */
+.esp32-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+}
+
+.esp32-divider::before,
+.esp32-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.esp32-divider span {
+    padding: 0 12px;
+}
+
+/* 연결 해제 섹션 */
+.disconnect-section {
+    margin-top: 12px;
+}

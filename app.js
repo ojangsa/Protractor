@@ -120,6 +120,16 @@
     let esp32SendTimeout = null;
     const ESP32_SEND_DEBOUNCE = 50; // 각도 전송 디바운스 시간 (ms)
 
+    // BLE (블루투스) 관련
+    const BLE_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+    const BLE_ANGLE_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef1';
+    const BLE_STATUS_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef2';
+    let bleDevice = null;
+    let bleServer = null;
+    let bleAngleCharacteristic = null;
+    let bleConnected = false;
+    let connectionMode = 'none'; // 'none', 'wifi', 'ble'
+
     // ESP32 DOM 요소
     const esp32ConnectBtn = document.getElementById('esp32-connect');
     const esp32StatusDot = document.getElementById('esp32-status-dot');
@@ -1366,9 +1376,10 @@
         }
     }
 
-    // ESP32로 각도 전송 (디바운스 적용)
+    // ESP32로 각도 전송 (디바운스 적용, WiFi 또는 BLE)
     function sendAngleToESP32(angle) {
-        if (!esp32Connected) return;
+        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
+        if (!esp32Connected && !bleConnected) return;
 
         // 디바운스: 이전 타이머 취소
         if (esp32SendTimeout) {
@@ -1376,26 +1387,132 @@
         }
 
         esp32SendTimeout = setTimeout(async () => {
-            try {
-                const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}`, {
-                    method: 'GET'
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(`ESP32 각도 전송 성공: ${angle}° → 서보: ${data.servoAngle}°`);
-                } else {
-                    console.error('ESP32 각도 전송 실패:', response.status);
+            // BLE 연결된 경우 우선
+            if (bleConnected && bleAngleCharacteristic) {
+                try {
+                    const encoder = new TextEncoder();
+                    await bleAngleCharacteristic.writeValue(encoder.encode(String(angle)));
+                    console.log(`BLE 각도 전송 성공: ${angle}°`);
+                } catch (err) {
+                    console.error('BLE 각도 전송 오류:', err);
+                    if (err.message.includes('GATT')) {
+                        handleBLEDisconnect();
+                    }
                 }
-            } catch (err) {
-                console.error('ESP32 각도 전송 오류:', err);
-                // 연결 끊김 감지
-                if (esp32Connected) {
-                    esp32Connected = false;
-                    updateESP32Status('disconnected');
+                return;
+            }
+
+            // WiFi 연결된 경우
+            if (esp32Connected) {
+                try {
+                    const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}`, {
+                        method: 'GET'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`WiFi 각도 전송 성공: ${angle}° → 서보: ${data.servoAngle}°`);
+                    } else {
+                        console.error('WiFi 각도 전송 실패:', response.status);
+                    }
+                } catch (err) {
+                    console.error('WiFi 각도 전송 오류:', err);
+                    // 연결 끊김 감지
+                    if (esp32Connected) {
+                        esp32Connected = false;
+                        connectionMode = 'none';
+                        updateESP32Status('disconnected');
+                    }
                 }
             }
         }, ESP32_SEND_DEBOUNCE);
+    }
+
+    // BLE 연결 시도
+    async function connectBLE() {
+        // Web Bluetooth API 지원 확인
+        if (!navigator.bluetooth) {
+            showESP32Message('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.', 'error');
+            return;
+        }
+
+        updateESP32Status('connecting');
+        showESP32Message('블루투스 장치 검색 중...', 'info');
+
+        try {
+            // 블루투스 장치 요청
+            bleDevice = await navigator.bluetooth.requestDevice({
+                filters: [{ name: 'Protractor-Servo' }],
+                optionalServices: [BLE_SERVICE_UUID]
+            });
+
+            showESP32Message('장치 연결 중...', 'info');
+
+            // 연결 해제 이벤트 리스너
+            bleDevice.addEventListener('gattserverdisconnected', handleBLEDisconnect);
+
+            // GATT 서버 연결
+            bleServer = await bleDevice.gatt.connect();
+
+            // 서비스 가져오기
+            const service = await bleServer.getPrimaryService(BLE_SERVICE_UUID);
+
+            // 각도 특성 가져오기
+            bleAngleCharacteristic = await service.getCharacteristic(BLE_ANGLE_CHAR_UUID);
+
+            // 연결 성공
+            bleConnected = true;
+            connectionMode = 'ble';
+            updateESP32Status('connected');
+            showESP32Message('🔵 블루투스 연결 성공!', 'success');
+            console.log('BLE 연결됨:', bleDevice.name);
+
+            // 현재 각도 동기화
+            sendAngleToESP32(lockedAngle);
+
+        } catch (err) {
+            console.error('BLE 연결 오류:', err);
+            bleConnected = false;
+            connectionMode = 'none';
+            updateESP32Status('disconnected');
+
+            if (err.name === 'NotFoundError') {
+                showESP32Message('장치를 찾을 수 없습니다. ESP32가 켜져 있는지 확인하세요.', 'error');
+            } else if (err.name === 'SecurityError') {
+                showESP32Message('블루투스 권한이 거부되었습니다.', 'error');
+            } else {
+                showESP32Message('블루투스 연결 실패: ' + err.message, 'error');
+            }
+        }
+    }
+
+    // BLE 연결 해제 처리
+    function handleBLEDisconnect() {
+        console.log('BLE 연결 해제됨');
+        bleConnected = false;
+        bleAngleCharacteristic = null;
+        bleServer = null;
+
+        if (connectionMode === 'ble') {
+            connectionMode = 'none';
+            updateESP32Status('disconnected');
+            showESP32Message('블루투스 연결이 해제되었습니다.', 'info');
+        }
+    }
+
+    // BLE 연결 해제
+    function disconnectBLE() {
+        if (bleDevice && bleDevice.gatt.connected) {
+            bleDevice.gatt.disconnect();
+        }
+        bleConnected = false;
+        bleAngleCharacteristic = null;
+        bleServer = null;
+        bleDevice = null;
+        connectionMode = 'none';
+        updateESP32Status('disconnected');
+        showESP32Message('블루투스 연결이 해제되었습니다.', 'info');
+        console.log('BLE 연결 해제');
     }
 
     // ESP32 상태 UI 업데이트
@@ -1482,6 +1599,10 @@
     // ESP32 연결 테스트 (전역 노출)
     window.testESP32Connection = testESP32Connection;
     window.disconnectESP32 = disconnectESP32;
+
+    // BLE 연결 함수 (전역 노출)
+    window.connectBLE = connectBLE;
+    window.disconnectBLE = disconnectBLE;
 
     // ESP32 버튼 클릭 이벤트 (모달 열기)
     if (esp32ConnectBtn) {
