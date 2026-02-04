@@ -152,7 +152,8 @@
     let bleServer = null;
     let bleAngleCharacteristic = null;
     let bleConnected = false;
-    let connectionMode = 'none'; // 'none', 'wifi', 'ble'
+    let connectionMode = 'none'; // 'none', 'wifi', 'wifi-blind', 'ble', 'native'
+    let isNativeApp = false;
 
     // ESP32 DOM 요소
     const esp32ConnectBtn = document.getElementById('esp32-connect');
@@ -203,8 +204,20 @@
         line1Group.style.display = 'none';
         if (toggleVerticalLineBtn) toggleVerticalLineBtn.classList.add('off');
 
-        // HTTP 환경에서 ESP32 자동 연결 시도
-        if (window.location.protocol === 'http:') {
+        // iOS Native App 감지
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHandler) {
+            isNativeApp = true;
+            connectionMode = 'native'; // 기본적으로 native 모드로 시작
+            console.log('iOS Native App Environment Detected');
+            writeToDebugLog('iOS Native App 감지됨', 'success');
+
+            // Native UI 업데이트
+            updateESP32Status('connected');
+            showESP32Message('iOS Native App 모드 (Bridge 연결됨)', 'info');
+        }
+
+        // HTTP 환경에서 ESP32 자동 연결 시도 (Native가 아닐 때만)
+        if (!isNativeApp && window.location.protocol === 'http:') {
             setTimeout(() => {
                 autoConnectESP32();
             }, 2000); // 2초 후 자동 연결 시도
@@ -1439,7 +1452,8 @@
     function sendAngleToESP32(angle) {
         // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
         // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
-        if (!esp32Connected && !bleConnected && connectionMode !== 'wifi-blind') return;
+        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
+        if (!esp32Connected && !bleConnected && connectionMode !== 'wifi-blind' && connectionMode !== 'native') return;
 
         // 디바운스: 이전 타이머 취소
         if (esp32SendTimeout) {
@@ -1447,6 +1461,12 @@
         }
 
         esp32SendTimeout = setTimeout(async () => {
+            // Native App 연결 (최우선)
+            if (connectionMode === 'native') {
+                sendAngleViaNative(angle);
+                return;
+            }
+
             // BLE 연결된 경우 우선
             if (bleConnected && bleAngleCharacteristic) {
                 try {
@@ -1535,12 +1555,41 @@
         img.src = url;
     }
 
+    // Native App으로 각도 전송
+    function sendAngleViaNative(angle) {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHandler) {
+            window.webkit.messageHandlers.nativeHandler.postMessage({
+                command: 'sendAngle',
+                value: angle
+            });
+            console.log(`Native Command Sent: ${angle}°`);
+        }
+    }
+
+    // Native App에서 호출하는 상태 업데이트 함수
+    window.updateNativeStatus = function (mode, status) {
+        if (status === 'connected') {
+            updateESP32Status('connected');
+            showESP32Message(`Native: ${mode} 연결됨`, 'success');
+        } else if (status === 'disconnected') {
+            updateESP32Status('disconnected');
+            showESP32Message(`Native: ${mode} 연결 해제`, 'warning');
+        }
+    };
+
     // BLE 연결 시도
     async function connectBLE() {
         writeToDebugLog('BLE 연결 시도 중...', 'info');
 
         // Web Bluetooth API 지원 확인
         if (!navigator.bluetooth) {
+            // Native App인 경우 Native Bridge 사용
+            if (isNativeApp) {
+                writeToDebugLog('Native BLE 연결 요청', 'info');
+                window.webkit.messageHandlers.nativeHandler.postMessage({ command: 'connectBLE' });
+                return;
+            }
+
             writeToDebugLog('Web Bluetooth 미지원 브라우저', 'error');
             showESP32Message('이 브라우저는 Web Bluetooth를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.', 'error');
             return;
