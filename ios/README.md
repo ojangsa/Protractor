@@ -41,3 +41,22 @@ Since I cannot generate an `.xcodeproj` file directly, you need to create one ma
 ## Troubleshooting
 -   **"index.html not found"**: Make sure you added the web files as "Folder References" (blue folder icon in Xcode) or that they are included in "Copy Bundle Resources" in Build Phases.
 -   **White Screen**: Check the Xcode console logs for any web loading errors.
+
+## Testing without a Paid Developer Account (Free Provisioning)
+
+Yes, you can install and test the app on your real iPhone **without paying $99/year**.
+
+1.  In Xcode, go to the project settings (click the top root node in the left file navigator).
+2.  Select the **Signing & Capabilities** tab.
+3.  Under **Team**, select **Add an Account...** and sign in with your regular Apple ID.
+4.  Once signed in, select your **Personal Team** (e.g., "Your Name (Personal Team)").
+5.  Set the **Bundle Identifier** to something unique (e.g., `com.yourname.ProtractorApp`).
+6.  Connect your iPhone and click **Run**.
+7.  **Trust Developer**:
+    -   The first time you run it, you will see an error on your iPhone: "Untrusted Developer".
+    -   On your iPhone, go to **Settings** -> **General** -> **VPN & Device Management** (or **Profiles & Device Management**).
+    -   Tap your Apple ID under "Developer App".
+    -   Tap **Trust "Your Apple ID"**.
+8.  Run the app again from Xcode.
+
+*Note: Free apps expire after 7 days. If the app stops opening, just reconnect to Xcode and Run again to Re-sign it.*
