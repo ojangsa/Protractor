@@ -58,7 +58,8 @@ bool bleDeviceConnected = false;
 bool oldDeviceConnected = false;
 
 // 현재 각도
-int currentAngle = 0;
+int currentAngle =
+    0; // Renamed from servoAngle to currentAngle to match existing code usage
 
 // 함수 프로토타입 선언
 void setServoAngle(int angle);

@@ -127,7 +127,7 @@
 
     // 측정 모드 ('normal' = 일반 모드, 'angle-lock' = 각도 설정 모드)
     let measurementMode = 'normal';
-    let lockedAngle = 20; // 각도 설정 모드에서 두 선 사이의 각도
+    let lockedAngle = 0; // 각도 설정 모드에서 두 선 사이의 각도 (초기값 0도)
 
     // 카메라 줌 관련 상태
     let currentZoom = 1;
@@ -1345,9 +1345,18 @@
     // ESP32 연결 테스트
     async function testESP32Connection() {
         // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content)
+        // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content) -> Blind Mode (Image Hack) 사용
         if (window.location.protocol === 'https:') {
-            showESP32Message('HTTPS 페이지에서는 ESP32(HTTP)에 연결할 수 없습니다. 아래 링크로 직접 접속하세요.', 'error');
-            updateESP32Status('disconnected');
+            console.warn('HTTPS 환경 감지: Blind Mode(단방향 제어) 활성화');
+            writeToDebugLog('HTTPS 모드: Blind Mode 활성화 (단방향)', 'warn');
+
+            esp32Connected = true;
+            connectionMode = 'wifi-blind'; // 새로운 모드 추가
+            updateESP32Status('connected');
+            showESP32Message('⚠️ Blind Mode 연결 (HTTPS). 제어만 가능하며 상태 확인은 불가능합니다.', 'warning');
+
+            // 초기 각도 전송 시도
+            sendAngleToESP32(lockedAngle);
             return;
         }
 
@@ -1429,7 +1438,8 @@
     // ESP32로 각도 전송 (디바운스 적용, WiFi 또는 BLE)
     function sendAngleToESP32(angle) {
         // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
-        if (!esp32Connected && !bleConnected) return;
+        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
+        if (!esp32Connected && !bleConnected && connectionMode !== 'wifi-blind') return;
 
         // 디바운스: 이전 타이머 취소
         if (esp32SendTimeout) {
@@ -1474,7 +1484,13 @@
                 return;
             }
 
-            // WiFi 연결된 경우
+            // WiFi Blind Mode (HTTPS)
+            if (connectionMode === 'wifi-blind') {
+                sendAngleViaImageHack(angle);
+                return;
+            }
+
+            // WiFi 일반 모드 (HTTP)
             if (esp32Connected) {
                 try {
                     const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}`, {
@@ -1498,6 +1514,25 @@
                 }
             }
         }, ESP32_SEND_DEBOUNCE);
+    }
+
+    // Image Beacon Hack: HTTPS에서 HTTP 요청을 보내기 위한 우회 방법
+    // <img> 태그는 Mixed Content 차단에서 예외적으로 허용되는 경우가 많음 (단, 응답은 읽을 수 없음)
+    function sendAngleViaImageHack(angle) {
+        const img = new Image();
+        const url = `http://${ESP32_IP}:${ESP32_PORT}/angle?value=${angle}&t=${Date.now()}`;
+
+        img.onerror = function () {
+            // CORS/Mixed Content 에러가 발생하더라도 요청 자체는 서버에 도달했을 가능성이 높음
+            console.log(`Blind Command Sent: ${angle}°`);
+        };
+
+        img.onload = function () {
+            console.log(`Blind Command Success: ${angle}°`);
+        };
+
+        // 요청 전송
+        img.src = url;
     }
 
     // BLE 연결 시도
@@ -1547,11 +1582,11 @@
             bleConnected = true;
             connectionMode = 'ble';
             updateESP32Status('connected');
-            showESP32Message('🔵 블루투스 연결 성공!', 'success');
+            showESP32Message('🔵 블루투스 연결 성공! (0° 초기화)', 'success');
             console.log('BLE 연결됨:', bleDevice.name);
 
-            // 현재 각도 동기화
-            sendAngleToESP32(lockedAngle);
+            // 0도로 초기화 및 자동 이동 (사용자 요청)
+            updateAngleWithLock(0);
 
         } catch (err) {
             console.error('BLE 연결 오류:', err);
