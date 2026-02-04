@@ -58,8 +58,14 @@ bool bleDeviceConnected = false;
 bool oldDeviceConnected = false;
 
 // 현재 각도
-int currentAngle =
-    0; // Renamed from servoAngle to currentAngle to match existing code usage
+// 현재 각도
+int currentAngle = 0;
+
+// 서보 이동 제어 변수
+unsigned long lastServoMoveTime = 0;
+const int SERVO_MOVE_INTERVAL = 200; // ms (이동 명령 간격)
+const int SERVO_LIMIT_MIN = 10;      // 서보 물리적 최소 각도
+const int SERVO_LIMIT_MAX = 170;     // 서보 물리적 최대 각도
 
 // 함수 프로토타입 선언
 void setServoAngle(int angle);
@@ -220,11 +226,20 @@ void loop() {
 // 입력: -90 ~ +90 (각도기 값)
 // 출력: 0 ~ 180 (서보 모터 값)
 void setServoAngle(int angle) {
-  // 범위 제한
+  // 이동 간격 체크 (방해 방지)
+  if (millis() - lastServoMoveTime < SERVO_MOVE_INTERVAL) {
+    return;
+  }
+  lastServoMoveTime = millis();
+
+  // 범위 제한 (논리적 각도)
   angle = constrain(angle, ANGLE_MIN, ANGLE_MAX);
 
   // 각도기 값을 서보 값으로 변환: -90 → 0, 0 → 90, +90 → 180
   int servoAngle = angle + 90;
+
+  // 서보 물리적 범위 제한 (10 ~ 170도)
+  servoAngle = constrain(servoAngle, SERVO_LIMIT_MIN, SERVO_LIMIT_MAX);
 
   servo.write(servoAngle);
   currentAngle = angle;
