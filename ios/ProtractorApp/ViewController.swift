@@ -2,9 +2,10 @@ import UIKit
 import WebKit
 import CoreBluetooth
 
-class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManagerDelegate, CBPeripheralDelegate, WKUIDelegate {
+class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManagerDelegate, CBPeripheralDelegate, WKUIDelegate, WKNavigationDelegate {
     
     var webView: WKWebView!
+    var statusLabel: UILabel!
     
     // BLE Variables
     var centralManager: CBCentralManager!
@@ -14,13 +15,30 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     // Constants
     let BLE_SERVICE_UUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef0")
     let BLE_ANGLE_CHAR_UUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef1")
+    let BLE_STATUS_CHAR_UUID = CBUUID(string: "12345678-1234-5678-1234-56789abcdef2")
     let ESP32_WIFI_URL = "http://192.168.4.1"
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        setupUI() // Must be called FIRST to initialize statusLabel
         setupWebView()
         setupNativeLogic()
+    }
+
+    func setupUI() {
+        // Toast/Status Label
+        statusLabel = UILabel()
+        statusLabel.frame = CGRect(x: 20, y: 100, width: view.bounds.width - 40, height: 50)
+        statusLabel.backgroundColor = UIColor(white: 0, alpha: 0.7)
+        statusLabel.layer.cornerRadius = 10
+        statusLabel.clipsToBounds = true
+        statusLabel.textColor = .white
+        statusLabel.textAlignment = .center
+        statusLabel.font = UIFont.boldSystemFont(ofSize: 14)
+        statusLabel.alpha = 0 // Hidden by default
+        statusLabel.isUserInteractionEnabled = false
+        view.addSubview(statusLabel)
     }
     
     func setupWebView() {
@@ -40,20 +58,46 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
         webView = WKWebView(frame: view.bounds, configuration: config)
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         webView.uiDelegate = self
+        webView.navigationDelegate = self
         
-        // Disable scroll to feel like an app
+        // Disable scroll and adjust safe area behavior
         webView.scrollView.bounces = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         
         view.addSubview(webView)
+        
+        // Bring status label to front
+        view.bringSubviewToFront(statusLabel)
         
         // Load local index.html
         if let indexPath = Bundle.main.path(forResource: "index", ofType: "html") {
             let fileURL = URL(fileURLWithPath: indexPath)
             // Allow read access to the directory containing index.html
             webView.loadFileURL(fileURL, allowingReadAccessTo: fileURL.deletingLastPathComponent())
+            statusLabel.text = "Loading index.html..."
         } else {
             print("Error: index.html not found")
+            statusLabel.text = "Error: index.html not found.\nPlease add 'index.html' folder reference to Xcode project."
+            view.bringSubviewToFront(statusLabel)
         }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        statusLabel.text = "" // Clear status on success
+        statusLabel.isHidden = true
+        print("WebView loaded.")
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        statusLabel.text = "Load Error: \(error.localizedDescription)"
+        statusLabel.isHidden = false
+        view.bringSubviewToFront(statusLabel)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        statusLabel.text = "Nav Error: \(error.localizedDescription)"
+        statusLabel.isHidden = false
+        view.bringSubviewToFront(statusLabel)
     }
     
     func setupNativeLogic() {
@@ -65,19 +109,30 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     // Receive messages from JavaScript
     // Format: window.webkit.messageHandlers.nativeHandler.postMessage({command: "cmd", value: val})
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        print("Received JS Message Body: \(message.body)")
+        
         guard let dict = message.body as? [String: Any],
               let command = dict["command"] as? String else {
+            print("Error: Invalid message format")
             return
         }
         
-        print("Received JS Command: \(command)")
+        print("Processing Command: \(command)")
         
         switch command {
         case "connectBLE":
-            startBLEScan()
+            if let p = peripheral, p.state == .connected {
+                showToast("⚠️ Already Connected")
+                notifyWeb("Already connected to \(p.name ?? "Device")")
+            } else {
+                startBLEScan()
+            }
         case "sendAngle":
             if let angle = dict["value"] as? Int {
+                print("Command: sendAngle, Value: \(angle)")
                 sendAngle(angle)
+            } else {
+                print("Error: 'value' is not an Int. Raw value: \(String(describing: dict["value"]))")
             }
         case "disconnectBLE":
             disconnectBLE()
@@ -93,19 +148,31 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     // MARK: - Control Logic
     
     func sendAngle(_ angle: Int) {
+        print("Attempting to send angle: \(angle)")
+        
         // Try BLE first if available
-        if let p = peripheral, let c = angleCharacteristic, p.state == .connected {
-            let str = String(angle)
-            if let data = str.data(using: .utf8) {
-                // Write without response for speed, if possible (property check logic omitted for brevity, assuming supported as per ESP32 code)
-                p.writeValue(data, for: c, type: .withoutResponse)
-                notifyWeb("Angle sent via BLE: \(angle)")
+        if let p = peripheral, let c = angleCharacteristic {
+            if p.state == .connected {
+                let str = String(angle)
+                if let data = str.data(using: .utf8) {
+                    // Write without response for speed, if possible (property check logic omitted for brevity, assuming supported as per ESP32 code)
+                    p.writeValue(data, for: c, type: .withoutResponse)
+                    print("BLE Write Success: \(angle) (Data: \(str))")
+                    notifyWeb("Angle sent via BLE: \(angle)")
+                } else {
+                    print("Error: Failed to encode string to data")
+                }
+                return
+            } else {
+                print("Error: Peripheral is not connected (State: \(p.state.rawValue))")
             }
-            return
+        } else {
+            print("Error: Peripheral or Characteristic is nil. P: \(peripheral == nil ? "nil" : "ok"), C: \(angleCharacteristic == nil ? "nil" : "ok")")
         }
         
         // Try WiFi (HTTP) if BLE not ready
         // Native HTTP request bypasses Mixed Content issues
+        print("Falling back to WiFi...")
         sendViaWiFi(angle)
     }
     
@@ -119,7 +186,7 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("WiFi Error: \(error.localizedDescription)")
-                // Optional: Notify web about error
+                self.notifyWeb("WiFi Send Error: \(error.localizedDescription)")
             } else {
                 print("WiFi Success: \(angle)")
             }
@@ -134,10 +201,20 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
         }
     }
     
+    func showToast(_ message: String) {
+        DispatchQueue.main.async {
+            self.statusLabel.text = message
+            self.statusLabel.alpha = 1
+            
+            // Fade out after 3 seconds
+            UIView.animate(withDuration: 0.5, delay: 3.0, options: .curveEaseOut, animations: {
+                self.statusLabel.alpha = 0
+            }, completion: nil)
+        }
+    }
+    
     func updateWebBLEStatus(_ status: String) {
         // Call a JS function to update status UI
-        // Assuming app.js has a function exposed or we simply log for now
-        // A better approach: define a global function in app.js 'window.updateNativeStatus(mode, status)'
         let js = "if(window.updateNativeStatus) window.updateNativeStatus('ble', '\(status)');"
         DispatchQueue.main.async {
             self.webView.evaluateJavaScript(js, completionHandler: nil)
@@ -148,10 +225,13 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     
     func startBLEScan() {
         if centralManager.state == .poweredOn {
-            centralManager.scanForPeripherals(withServices: [BLE_SERVICE_UUID], options: nil)
+            // Scan for ALL devices (nil) to avoid missing the device if UUID is not in adv packet
+            centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
             notifyWeb("Scanning for Protractor-Servo...")
+            showToast("🔍 Scanning for Device...")
         } else {
             notifyWeb("Bluetooth is not ready.")
+            showToast("❌ Bluetooth not ready")
         }
     }
     
@@ -178,18 +258,24 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         print("Discovered: \(peripheral.name ?? "Unknown")")
         
-        // Connect automatically to our device
-        self.peripheral = peripheral
-        self.peripheral?.delegate = self
-        centralManager.stopScan()
-        centralManager.connect(peripheral, options: nil)
-        notifyWeb("Connecting to \(peripheral.name ?? "Device")...")
+        // Filter by Name since UUID scanning can be flaky
+        // Search for "Pro-Servo" (New) or "Protractor" (Old/Cached)
+        if let name = peripheral.name, (name.contains("Pro") || name.contains("Protractor")) {
+            // Connect automatically to our device
+            self.peripheral = peripheral
+            self.peripheral?.delegate = self
+            centralManager.stopScan()
+            centralManager.connect(peripheral, options: nil)
+            notifyWeb("Connecting to \(name)...")
+            showToast("✅ Found \(name)! Connecting...")
+        }
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("Connected to \(peripheral.name ?? "n/a")")
         updateWebBLEStatus("connected")
         peripheral.discoverServices([BLE_SERVICE_UUID])
+        showToast("🔗 Connected!")
     }
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
@@ -202,7 +288,8 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let services = peripheral.services {
             for service in services {
-                peripheral.discoverCharacteristics([BLE_ANGLE_CHAR_UUID], for: service)
+                // Discover Angle AND Status characteristics
+                peripheral.discoverCharacteristics([BLE_ANGLE_CHAR_UUID, BLE_STATUS_CHAR_UUID], for: service)
             }
         }
     }
@@ -212,10 +299,26 @@ class ViewController: UIViewController, WKScriptMessageHandler, CBCentralManager
             for characteristic in characteristics {
                 if characteristic.uuid == BLE_ANGLE_CHAR_UUID {
                     self.angleCharacteristic = characteristic
-                    print("Angle Characteristic Found")
+                    print("✅ Angle Characteristic Found")
                     notifyWeb("BLE Ready!")
+                } else if characteristic.uuid == BLE_STATUS_CHAR_UUID {
+                    print("✅ Status Characteristic Found - Enabling Notify")
+                    peripheral.setNotifyValue(true, for: characteristic)
                 }
             }
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            print("Error receiving notification: \(error.localizedDescription)")
+            return
+        }
+        
+        if characteristic.uuid == BLE_STATUS_CHAR_UUID, let data = characteristic.value {
+            let statusStr = String(data: data, encoding: .utf8) ?? "Invalid Data"
+            print("📩 ESP32 Status Update: \(statusStr)")
+            showToast("ESP32 Ack: \(statusStr)")
         }
     }
 }

@@ -164,14 +164,41 @@
     const esp32DisconnectBtn = document.getElementById('esp32-disconnect-btn');
     const esp32Message = document.getElementById('esp32-message');
 
-    // 초기화
-    init();
+    // 레이저 싱크 버튼
+    const syncLaserBtn = document.getElementById('sync-laser-btn');
+    let lastSyncedAngle = 0; // 마지막으로 전송된 각도
+    let pendingAngleSync = false; // 전송 대기 중인 각도가 있는지
 
+    // 레이저 제어 버튼 및 상태
+    const laserToggleBtn = document.getElementById('laser-toggle-btn');
+    let laserState = false; // false: OFF, true: ON
+    let bleLaserCharacteristic = null; // BLE 레이저 Characteristic
+
+    // 앱 초기화
     function init() {
+        logToNative("JS Loaded: Version 1.0.2 (Fixed Init)");
+
+        // PWA 설치 상태 확인
+        checkPWAInstalls();
+
+        // 가로 모드 전용 (세로 모드 비활성화)
+        orientationMode = 'landscape';
+        overlay.setAttribute('viewBox', '0 0 100 100');
+        currentCenter.x = 50;
+        currentCenter.y = 95;
+        const protractorGroup = document.getElementById('protractor-group');
+        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
+
+        // 각도기 눈금 생성
         createTickMarks();
-        updateLines();
+
+        // 기준선 초기 위치 설정
         updateGravityLine();
         updateTiltLine();
+
+        // 각도선 초기 위치 업데이트
+        updateLines();
+
         setupEventListeners();
         setupDeviceOrientation();
         requestCameraAccess();
@@ -186,14 +213,6 @@
         if (window.writeToDebugLog) { // Ensure writeToDebugLog is defined
             writeToDebugLog('앱 초기화 완료', 'success');
         }
-
-        // 가로 모드 전용 (세로 모드 비활성화)
-        orientationMode = 'landscape';
-        overlay.setAttribute('viewBox', '0 0 100 100');
-        currentCenter.x = 50;
-        currentCenter.y = 95;
-        const protractorGroup = document.getElementById('protractor-group');
-        protractorGroup.setAttribute('transform', `translate(${currentCenter.x}, ${currentCenter.y})`);
 
         // 화면 방향 가로로 잠금 (회전 방지)
         lockScreenOrientation('landscape');
@@ -226,6 +245,7 @@
         // 키보드 단축키가 바로 작동하도록 포커스 설정
         document.body.focus();
     }
+
 
     // 눈금 생성
     function createTickMarks() {
@@ -381,10 +401,21 @@
         // 측정 모드 전환
         switchModeBtn.addEventListener('click', toggleMeasurementMode);
 
+        // 레이저 싱크 버튼
+        if (syncLaserBtn) {
+            syncLaserBtn.addEventListener('click', syncLaserAngle);
+        }
+
+        // 레이저 ON/OFF 버튼
+        if (laserToggleBtn) {
+            laserToggleBtn.addEventListener('click', toggleLaser);
+        }
+
         // 중심점 리셋
         resetCenterBtn.addEventListener('click', () => {
             resetCenter();
         });
+
 
         // 도움말 모달 이벤트: HTML 인라인 onclick 사용으로 변경 (아이패드 호환성)
         // 기존 addEventListener 코드 제거됨
@@ -567,11 +598,20 @@
                 window.openESP32Modal();
                 e.preventDefault();
                 break;
+
+            // L: 레이저 싱크 (각도 전송)
+            case 'l':
+            case 'L':
+                syncLaserAngle();
+                e.preventDefault();
+                break;
         }
+
     }
 
     // 각도설정 모드에서 선 위치 업데이트
     function updateLockedAngleLines() {
+        logToNative(`updateLockedAngleLines called. lockedAngle: ${lockedAngle}`);
         // line1(수직선)은 수평 기준선과 항상 직각
         angle1 = gravityAngle + 90;
 
@@ -590,8 +630,8 @@
 
         updateLines();
 
-        // ESP32 서보 모터로 각도 전송
-        sendAngleToESP32(lockedAngle);
+        // 각도가 변경되었음을 표시 (자동 전송 제거)
+        updateSyncButtonState();
     }
 
     // 수평 기준선 업데이트 (좌우 기울기)
@@ -666,6 +706,125 @@
         }
         console.log('수직선 표시:', verticalLineVisible);
     }
+
+    // 레이저 싱크 버튼 상태 업데이트
+    function updateSyncButtonState() {
+        if (!syncLaserBtn) return;
+
+        // 현재 각도와 마지막 전송된 각도가 다르면 강조 표시
+        if (lockedAngle !== lastSyncedAngle) {
+            syncLaserBtn.classList.add('pending-sync');
+            pendingAngleSync = true;
+        } else {
+            syncLaserBtn.classList.remove('pending-sync');
+            pendingAngleSync = false;
+        }
+    }
+
+    // 레이저 싱크 실행 (수동 각도 전송)
+    function syncLaserAngle() {
+        console.log('레이저 싱크 실행:', lockedAngle);
+
+        // ESP32로 현재 각도 전송
+        sendAngleToESP32(lockedAngle);
+
+        // 마지막 전송 각도 업데이트
+        lastSyncedAngle = lockedAngle;
+
+        // 버튼 상태 업데이트
+        updateSyncButtonState();
+
+        // 시각적 피드백 (버튼 짧게 강조)
+        if (syncLaserBtn) {
+            syncLaserBtn.classList.add('sync-active');
+            setTimeout(() => {
+                syncLaserBtn.classList.remove('sync-active');
+            }, 200);
+        }
+    }
+
+
+    // ===== 레이저 제어 함수들 =====
+
+    // 레이저 ON/OFF 토글
+    function toggleLaser() {
+        laserState = !laserState;
+        sendLaserCommand(laserState);
+        updateLaserButton();
+    }
+
+    // 레이저 버튼 상태 업데이트
+    function updateLaserButton() {
+        if (!laserToggleBtn) return;
+
+        if (laserState) {
+            laserToggleBtn.classList.add('laser-on');
+        } else {
+            laserToggleBtn.classList.remove('laser-on');
+        }
+    }
+
+    // 레이저 명령 전송 (BLE/WiFi)
+    function sendLaserCommand(state) {
+        const stateValue = state ? "1" : "0";
+        console.log('레이저 명령 전송:', state ? 'ON' : 'OFF');
+
+        // Native App 모드
+        if (connectionMode === 'native' || isNativeApp) {
+            sendLaserViaNative(state);
+            return;
+        }
+
+        // BLE 모드
+        if (bleConnected && bleLaserCharacteristic) {
+            try {
+                const bytes = new Uint8Array(stateValue.length);
+                for (let i = 0; i < stateValue.length; i++) {
+                    bytes[i] = stateValue.charCodeAt(i);
+                }
+                bleLaserCharacteristic.writeValue(bytes);
+                console.log(`BLE 레이저 전송: ${state ? 'ON' : 'OFF'}`);
+            } catch (err) {
+                console.error('BLE 레이저 전송 오류:', err);
+            }
+            return;
+        }
+
+        // WiFi 모드
+        if (esp32Connected || connectionMode === 'wifi-blind') {
+            sendLaserViaWiFi(state);
+        }
+    }
+
+    // WiFi로 레이저 명령 전송
+    async function sendLaserViaWiFi(state) {
+        const stateValue = state ? 1 : 0;
+
+        try {
+            const response = await fetch(`http://${ESP32_IP}:${ESP32_PORT}/laser?state=${stateValue}`, {
+                method: 'GET'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('WiFi 레이저 응답:', data);
+            }
+        } catch (err) {
+            console.error('WiFi 레이저 전송 오류:', err);
+        }
+    }
+
+    // Native App으로 레이저 명령 전송
+    function sendLaserViaNative(state) {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHandler) {
+            const message = { type: 'laser', state: state };
+            window.webkit.messageHandlers.nativeHandler.postMessage(message);
+            console.log('Native 레이저 전송:', state ? 'ON' : 'OFF');
+        }
+    }
+
+    // ===== 끝: 레이저 제어 함수들 =====
+
 
     // DeviceOrientation 설정
     function setupDeviceOrientation() {
@@ -770,6 +929,21 @@
             tiltOk.classList.remove('hidden');
         } else {
             tiltOk.classList.add('hidden');
+        }
+    }
+
+    // PWA 설치 상태 확인
+    function checkPWAInstalls() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isIOS && !isStandalone) {
+            const lastPrompt = localStorage.getItem('iosInstallPromptDismissed');
+            const now = Date.now();
+            if (!lastPrompt || (now - parseInt(lastPrompt)) > 24 * 60 * 60 * 1000) {
+                const banner = document.getElementById('ios-install-banner');
+                if (banner) banner.classList.remove('hidden');
+            }
         }
     }
 
@@ -952,6 +1126,7 @@
 
     // 포인터 이벤트 핸들러
     function onPointerDown(e) {
+        logToNative(`onPointerDown: ${e.clientX}, ${e.clientY}`);
         const point = getSVGPoint(e.clientX, e.clientY);
         if (checkCenterHit(point)) return;
         checkHandleHit(point);
@@ -976,6 +1151,7 @@
 
     // 터치 이벤트 핸들러
     function onTouchStart(e) {
+        logToNative(`onTouchStart: touches=${e.touches.length}`);
         // 핀치 줌 시작 (두 손가락)
         if (e.touches.length === 2) {
             e.preventDefault();
@@ -1058,6 +1234,8 @@
 
         const dist1 = Math.hypot(point.x - handle1Pos.x, point.y - handle1Pos.y);
         const dist2 = Math.hypot(point.x - handle2Pos.x, point.y - handle2Pos.y);
+
+        logToNative(`checkHandleHit: dist1=${dist1.toFixed(1)}, dist2=${dist2.toFixed(1)}, radius=${hitRadius}`);
 
         console.log('Touch point:', point, 'Handle1:', handle1Pos, 'Handle2:', handle2Pos);
         console.log('Distances:', dist1, dist2, 'Hit radius:', hitRadius);
@@ -1159,6 +1337,9 @@
         }
 
         updateLines();
+
+        // 일반 모드에서도 각도 변경 시 모터 제어를 위해 동기화 호출
+        syncLockedAngle();
     }
 
     // 카메라 접근
@@ -1300,6 +1481,10 @@
             while (diff > 180) diff -= 360;
             while (diff < -180) diff += 360;
             lockedAngle = Math.round(diff);
+
+            // 각도가 변경되었음을 표시
+            updateSyncButtonState();
+            angleInput.value = lockedAngle;
         }
     }
 
@@ -1321,8 +1506,8 @@
 
             updateLines();
 
-            // ESP32 서보 모터로 각도 전송
-            sendAngleToESP32(lockedAngle);
+            // 각도가 변경되었음을 표시
+            updateSyncButtonState();
         }
     }
 
@@ -1357,6 +1542,19 @@
 
     // ESP32 연결 테스트
     async function testESP32Connection() {
+        // iOS Native App 감지 시 (HTTP 요청 없이 바로 연결 처리)
+        if (isNativeApp) {
+            logToNative("testESP32Connection: Native App Detected");
+            esp32Connected = true;
+            connectionMode = 'native';
+            updateESP32Status('connected');
+            showESP32Message('iOS Native App: WiFi 연결 모드 활성화', 'success');
+
+            // 초기 각도는 레이저 싱크 버튼으로 수동 전송
+            // (자동 전송 제거)
+            return;
+        }
+
         // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content)
         // HTTPS 환경에서는 HTTP 요청 불가 (Mixed Content) -> Blind Mode (Image Hack) 사용
         if (window.location.protocol === 'https:') {
@@ -1368,8 +1566,8 @@
             updateESP32Status('connected');
             showESP32Message('⚠️ Blind Mode 연결 (HTTPS). 제어만 가능하며 상태 확인은 불가능합니다.', 'warning');
 
-            // 초기 각도 전송 시도
-            sendAngleToESP32(lockedAngle);
+            // 초기 각도는 레이저 싱크 버튼으로 수동 전송
+            // (자동 전송 제거)
             return;
         }
 
@@ -1394,8 +1592,8 @@
                 showESP32Message(`연결 성공! 현재 각도: ${data.angle}°`, 'success');
                 console.log('ESP32 연결됨:', data);
 
-                // 현재 각도 동기화
-                sendAngleToESP32(lockedAngle);
+                // 초기 각도는 레이저 싱크 버튼으로 수동 전송
+                // (자동 전송 제거)
             } else {
                 throw new Error('응답 오류');
             }
@@ -1439,8 +1637,8 @@
                 updateESP32Status('connected');
                 console.log('ESP32 자동 연결 성공:', data);
 
-                // 현재 각도 동기화
-                sendAngleToESP32(lockedAngle);
+                // 초기 각도는 레이저 싱크 버튼으로 수동 전송
+                // (자동 전송 제거)
             }
         } catch (err) {
             // 자동 연결 실패 시 조용히 무시 (사용자에게 알림 없음)
@@ -1450,10 +1648,12 @@
 
     // ESP32로 각도 전송 (디바운스 적용, WiFi 또는 BLE)
     function sendAngleToESP32(angle) {
+        logToNative(`sendAngleToESP32 called with: ${angle}`);
         // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
-        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
-        // WiFi나 BLE 둘 중 하나라도 연결되어 있어야 함
-        if (!esp32Connected && !bleConnected && connectionMode !== 'wifi-blind' && connectionMode !== 'native') return;
+        if (!esp32Connected && !bleConnected && connectionMode !== 'wifi-blind' && connectionMode !== 'native') {
+            // logToNative(`sendAngleToESP32 Ignored: Not connected (Mode: ${connectionMode})`);
+            return;
+        }
 
         // 디바운스: 이전 타이머 취소
         if (esp32SendTimeout) {
@@ -1462,7 +1662,7 @@
 
         esp32SendTimeout = setTimeout(async () => {
             // Native App 연결 (최우선)
-            if (connectionMode === 'native') {
+            if (connectionMode === 'native' || isNativeApp) { // isNativeApp 추가 체크
                 sendAngleViaNative(angle);
                 return;
             }
@@ -1558,24 +1758,48 @@
     // Native App으로 각도 전송
     function sendAngleViaNative(angle) {
         if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHandler) {
-            window.webkit.messageHandlers.nativeHandler.postMessage({
-                command: 'sendAngle',
-                value: angle
-            });
-            console.log(`Native Command Sent: ${angle}°`);
+            try {
+                // Swift에서 'as? Int'로 받으므로 반드시 정수로 변환해야 함
+                const intAngle = Math.round(angle);
+                window.webkit.messageHandlers.nativeHandler.postMessage({
+                    command: 'sendAngle',
+                    value: intAngle
+                });
+                console.log(`Native Command Sent: ${intAngle}° (Original: ${angle})`);
+            } catch (e) {
+                console.error('Native Bridge Error:', e);
+            }
         }
     }
 
     // Native App에서 호출하는 상태 업데이트 함수
     window.updateNativeStatus = function (mode, status) {
+        logToNative(`updateNativeStatus called: ${mode}, ${status}`);
         if (status === 'connected') {
             updateESP32Status('connected');
             showESP32Message(`Native: ${mode} 연결됨`, 'success');
+
+            // Native 모드 및 BLE 연결 상태 강제 설정
+            connectionMode = 'native';
+            bleConnected = true;
+            esp32Connected = true;
+
         } else if (status === 'disconnected') {
             updateESP32Status('disconnected');
             showESP32Message(`Native: ${mode} 연결 해제`, 'warning');
+            bleConnected = false;
         }
     };
+
+    // Debug helper to send logs to Swift
+    function logToNative(msg) {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHandler) {
+            window.webkit.messageHandlers.nativeHandler.postMessage({
+                command: 'log',
+                value: msg
+            });
+        }
+    }
 
     // BLE 연결 시도
     async function connectBLE() {
@@ -1624,18 +1848,31 @@
 
             // 각도 특성 가져오기
             writeToDebugLog('각도 특성 가져오는 중...', 'info');
-            bleAngleCharacteristic = await service.getCharacteristic(BLE_ANGLE_CHAR_UUID);
-            writeToDebugLog('각도 특성 획득 성공', 'success');
+            bleAngleCharacteristic = await service.getCharacteristic('12345678-1234-5678-1234-56789abcdef1');
+            console.log('Angle Characteristic 연결 성공');
+
+            // 레이저 Characteristic 가져오기
+            try {
+                bleLaserCharacteristic = await service.getCharacteristic('12345678-1234-5678-1234-56789abcdef3');
+                console.log('Laser Characteristic 연결 성공');
+            } catch (err) {
+                console.warn('Laser Characteristic 연결 실패 (구형 펌웨어일 수 있음):', err);
+                bleLaserCharacteristic = null;
+            }
 
             // 연결 성공
             bleConnected = true;
             connectionMode = 'ble';
             updateESP32Status('connected');
-            showESP32Message('🔵 블루투스 연결 성공! (0° 초기화)', 'success');
+            showESP32Message('🔵 블루투스 연결 성공! (0° 자동 이동)', 'success');
             console.log('BLE 연결됨:', bleDevice.name);
 
-            // 0도로 초기화 및 자동 이동 (사용자 요청)
+            // 0도로 화면 및 서보 초기화 (BLE 연결 시에만 자동 전송)
             updateAngleWithLock(0);
+            sendAngleToESP32(0);
+            lastSyncedAngle = 0; // 싱크 상태 업데이트
+
+
 
         } catch (err) {
             console.error('BLE 연결 오류:', err);
@@ -1658,6 +1895,7 @@
         console.log('BLE 연결 해제됨');
         bleConnected = false;
         bleAngleCharacteristic = null;
+        bleLaserCharacteristic = null;  // 레이저 Characteristic 초기화
         bleServer = null;
 
         if (connectionMode === 'ble') {
@@ -1810,4 +2048,7 @@
             window.openESP32Modal();
         });
     }
+
+    // 앱 시작 (초기화 함수 호출)
+    init();
 })();
